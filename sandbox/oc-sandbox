@@ -7,6 +7,7 @@ set -euo pipefail
 IMAGE_NAME="${OC_SANDBOX_IMAGE:-localhost/opencode-sandbox:latest}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONTAINERFILE="${SCRIPT_DIR}/Containerfile"
+OPENCODE_INSTALL_SHA256_FILE="${SCRIPT_DIR}/opencode-install.sha256"
 
 # Terminal colors
 RED='\033[0;31m'
@@ -60,8 +61,22 @@ build_image() {
     local force="${1:-false}"
 
     if [ "$force" = "true" ] || ! podman image exists "$IMAGE_NAME" 2>/dev/null; then
+        # Read SHA256 checksum from file
+        if [ ! -f "$OPENCODE_INSTALL_SHA256_FILE" ]; then
+            error "Checksum file not found: $OPENCODE_INSTALL_SHA256_FILE"
+        fi
+        local sha256
+        sha256=$(head -n 1 "$OPENCODE_INSTALL_SHA256_FILE" | tr -d '[:space:]')
+        if [ -z "$sha256" ]; then
+            error "Checksum file is empty: $OPENCODE_INSTALL_SHA256_FILE"
+        fi
+
         info "Building container image..."
-        if ! podman build -t "$IMAGE_NAME" -f "$CONTAINERFILE" "$SCRIPT_DIR"; then
+        if ! podman build \
+            --build-arg "OPENCODE_INSTALL_SHA256=${sha256}" \
+            -t "$IMAGE_NAME" \
+            -f "$CONTAINERFILE" \
+            "$SCRIPT_DIR"; then
             error "Container build failed. See output above for details."
         fi
         info "Image built successfully."
