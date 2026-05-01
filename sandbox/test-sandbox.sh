@@ -140,8 +140,8 @@ echo "--- Test: Path is not a directory ---"
 
 NOT_DIR="${TEST_DIR}/not_a_dir"
 touch "$NOT_DIR"
-    OUTPUT=$("$OC_SANDBOX" --profile dev "$NOT_DIR" 2>&1)
-    EXIT_CODE=$?
+OUTPUT=$("$OC_SANDBOX" --profile dev "$NOT_DIR" 2>&1)
+EXIT_CODE=$?
 if [ "$EXIT_CODE" -ne 0 ]; then
     pass "oc-sandbox with non-directory path exits with error"
 else
@@ -159,16 +159,11 @@ echo "--- Test: Outside home directory warning ---"
 # by piping 'n' to reject the warning
 OUTPUT=$(echo "n" | "$OC_SANDBOX" --profile dev /tmp 2>&1)
 EXIT_CODE=$?
-if [ "$EXIT_CODE" -eq 0 ]; then
-    # User chose to abort, exit code should be 0 (clean exit)
-    pass "oc-sandbox aborts when user rejects outside-home warning"
+if [ "$EXIT_CODE" -ne 0 ]; then
+    # When stdin is not a terminal, script errors out
+    pass "oc-sandbox errors when outside-home and non-interactive"
 else
-    # May also exit with error if podman not available
-    if [ "$PODMAN_AVAILABLE" = "false" ]; then
-        pass "oc-sandbox exits (podman not available after warning)"
-    else
-        fail "oc-sandbox should exit cleanly when user aborts"
-    fi
+    fail "oc-sandbox should exit with error for outside-home non-interactive"
 fi
 assert_stderr_contains "$OUTPUT" "outside your home directory" "Warning mentions home directory"
 
@@ -222,7 +217,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             "$IMAGE_NAME" \
             bash -c "touch /test_write 2>&1; echo exit_code=\$?") || true
         
-        if echo "$OUTPUT" | grep -q "exit_code=1\|Permission denied\|Read-only file system"; then
+        if printf '%s' "$OUTPUT" | grep -q "exit_code=1\|Permission denied\|Read-only file system"; then
             pass "Container cannot write to / (read-only filesystem)"
         else
             fail "Container should not be able to write to /"
@@ -239,7 +234,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             "$IMAGE_NAME" \
             bash -c "touch /workspace/test_write && echo success || echo failure") || true
         
-        if echo "$OUTPUT" | grep -q "success"; then
+        if printf '%s' "$OUTPUT" | grep -q "success"; then
             pass "Container can write to /workspace"
         else
             fail "Container should be able to write to /workspace"
@@ -256,7 +251,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             "$IMAGE_NAME" \
             bash -c "touch /tmp/test_write && echo success || echo failure") || true
         
-        if echo "$OUTPUT" | grep -q "success"; then
+        if printf '%s' "$OUTPUT" | grep -q "success"; then
             pass "Container can write to /tmp"
         else
             fail "Container should be able to write to /tmp"
@@ -289,7 +284,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             "$IMAGE_NAME" \
             bash -c "whoami") || true
         
-        if echo "$OUTPUT" | grep -q "sandbox"; then
+        if printf '%s' "$OUTPUT" | grep -q "sandbox"; then
             pass "Container runs as sandbox user (not root)"
         else
             fail "Container should run as sandbox user, got: $OUTPUT"
@@ -307,7 +302,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             "$IMAGE_NAME" \
             bash -c "which sudo 2>/dev/null && echo 'sudo found' || echo 'sudo not found'") || true
         
-        if echo "$OUTPUT" | grep -q "sudo not found"; then
+        if printf '%s' "$OUTPUT" | grep -q "sudo not found"; then
             pass "sudo is not available in the container"
         else
             fail "sudo should not be available in the container"
