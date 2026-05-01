@@ -46,7 +46,7 @@ assert_stderr_contains() {
     local output="$1"
     local pattern="$2"
     local description="$3"
-    if printf '%s' "$output" | grep -q "$pattern"; then
+    if printf '%s' "$output" | grep -q -- "$pattern"; then
         pass "$description"
     else
         fail "$description (expected pattern: '$pattern')"
@@ -103,16 +103,21 @@ echo ""
 echo "--- Test: Invalid profile ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-    # This test requires podman and a built image
-    # Build the image first if needed
-    OUTPUT=$("$OC_SANDBOX" --profile nonexistent --build 2>&1)
-    EXIT_CODE=$?
-    if [ "$EXIT_CODE" -ne 0 ]; then
-        pass "oc-sandbox with invalid profile exits with error"
+    IMAGE_NAME="${OC_SANDBOX_IMAGE:-localhost/opencode-sandbox:latest}"
+    if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+        # Test with a profile name that has invalid characters (path traversal)
+        # This validates before image operations
+        OUTPUT=$("$OC_SANDBOX" --profile "invalid/profile" 2>&1)
+        EXIT_CODE=$?
+        if [ "$EXIT_CODE" -ne 0 ]; then
+            pass "oc-sandbox with invalid profile exits with error"
+        else
+            fail "oc-sandbox with invalid profile should exit with error"
+        fi
+        assert_stderr_contains "$OUTPUT" "Profile name must not contain" "Error message mentions invalid profile"
     else
-        fail "oc-sandbox with invalid profile should exit with error"
+        skip "Invalid profile test (image not built)"
     fi
-    assert_stderr_contains "$OUTPUT" "Invalid profile" "Error message mentions invalid profile"
 else
     skip "Invalid profile test (podman not available)"
 fi

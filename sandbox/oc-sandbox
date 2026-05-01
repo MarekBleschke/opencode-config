@@ -150,9 +150,14 @@ if [ ! -e "$WORKSPACE_PATH" ]; then
     error "PATH does not exist: $WORKSPACE_PATH"
 fi
 
+# Validate path is a directory before trying to cd
+if [ ! -d "$WORKSPACE_PATH" ]; then
+    error "PATH is not a directory: $WORKSPACE_PATH"
+fi
+
 WORKSPACE_PATH="$(cd "$WORKSPACE_PATH" && pwd)"
 
-# Validate path is a directory
+# Double-check after cd resolves symlinks
 if [ ! -d "$WORKSPACE_PATH" ]; then
     error "PATH is not a directory: $WORKSPACE_PATH"
 fi
