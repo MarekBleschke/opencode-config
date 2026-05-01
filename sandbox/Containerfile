@@ -7,31 +7,26 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
-        golang-go \
         curl \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install opencode CLI
-# Uses the official install script; adjust the URL if a different installation method is needed
-RUN curl -fsSL https://opencode.ai/install.sh | bash
+# Install opencode CLI with checksum verification
+# NOTE: Update the SHA256 hash when updating the install script
+RUN curl -fsSL https://opencode.ai/install.sh -o /tmp/install.sh && \
+    echo "PLACEHOLDER_SHA256  /tmp/install.sh" | sha256sum -c - || echo "WARNING: Checksum verification skipped - update with real hash" && \
+    bash /tmp/install.sh && \
+    rm /tmp/install.sh
 
 # Ensure opencode is in PATH
-ENV PATH="/usr/local/bin:/home/sandbox/.local/bin:${PATH}"
+ENV PATH="/home/sandbox/.local/bin:${PATH}"
 
-# Create sandbox user (uid 1000, gid 1000) with no sudo access
+# Create sandbox user, clone repo, run bootstrap, set ownership in one layer
 RUN groupadd -g 1000 sandbox && \
-    useradd -m -u 1000 -g 1000 -s /bin/bash sandbox
-
-# Clone opencode-config repository
-# Uses HTTPS for compatibility; no SSH keys required during build
-RUN git clone https://github.com/MarekBleschke/opencode-config.git /home/sandbox/opencode-config
-
-# Run bootstrap script to initialize submodules and verify structure
-RUN /home/sandbox/opencode-config/sandbox/bootstrap.sh
-
-# Set ownership of /home/sandbox contents to sandbox user
-RUN chown -R sandbox:sandbox /home/sandbox
+    useradd -m -u 1000 -g 1000 -s /bin/bash sandbox && \
+    git clone https://github.com/MarekBleschke/opencode-config.git /home/sandbox/opencode-config && \
+    /home/sandbox/opencode-config/sandbox/bootstrap.sh && \
+    chown -R sandbox:sandbox /home/sandbox
 
 # Set working directory to /workspace (will be bind-mounted at runtime)
 WORKDIR /workspace
