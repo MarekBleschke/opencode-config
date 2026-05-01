@@ -24,7 +24,8 @@ echo "Verifying submodule symlinks..."
 # The dev profile uses symlinks that point into submodules
 # After submodule init, these should resolve
 if [ ! -f "profiles/dev/opencode.json" ]; then
-    echo "Warning: dev profile opencode.json not found (submodules may not be fully initialized)"
+    echo "Error: dev profile opencode.json not found (submodules may not be fully initialized)" >&2
+    exit 1
 fi
 
 echo "Bootstrap complete."
