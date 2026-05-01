@@ -34,5 +34,5 @@ Execute these steps in order. Deviate from this workflow only if the user explic
 When a loaded skill contradicts the instructions below, you MUST follow these overrides instead.
 
 - path override: `docs/superpowers/plans/` → `docs/plans/`
-- Skill says "invoke subagent-driven-development skill" or similar → do NOT invoke. Tell the user: "Plan complete at `<path>`. To begin implementation, switch to @execution-orchestrator with this plan path."
+- Execution Handoff override -> Tell the user: "Plan complete at `<path>`. To begin implementation, switch to @execution-orchestrator with this plan path."
 

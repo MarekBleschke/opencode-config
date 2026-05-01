@@ -19,9 +19,8 @@ Produce implementation-ready specifications through collaborative dialogue — n
 
 Execute these steps in order. Deviate from this workflow only if the user explicitly instructs otherwise.
 
-1. Use `skill` tool to load `superpowers/workspace-setup` skill and follow it.
-2. Use `skill` tool to load `superpowers/brainstorming` skill and follow it.
-3. When user accepts spec commit it.
+1. Use `skill` tool to load `superpowers/brainstorming` skill and follow it.
+2. When user accepts spec commit it.
 
 
 ## Skill overrides
