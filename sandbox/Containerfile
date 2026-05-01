@@ -9,31 +9,35 @@ RUN apt-get update && \
         git \
         curl \
         ca-certificates \
-        golang-go \
     && rm -rf /var/lib/apt/lists/*
+
+# Install opencode CLI with checksum verification
+ARG OPENCODE_INSTALL_SHA256
+RUN curl -fsSL https://opencode.ai/install -o /tmp/install.sh && \
+    if [ -n "${OPENCODE_INSTALL_SHA256}" ]; then \
+        echo "${OPENCODE_INSTALL_SHA256}  /tmp/install.sh" | sha256sum -c - ; \
+    else \
+        echo "ERROR: OPENCODE_INSTALL_SHA256 build arg must be set" >&2 ; \
+        exit 1 ; \
+    fi && \
+    bash /tmp/install.sh && \
+    rm /tmp/install.sh && \
+    cp /root/.opencode/bin/opencode /usr/local/bin/opencode && \
+    chmod +x /usr/local/bin/opencode
 
 # Create sandbox user (using UID/GID 1001 to avoid conflicts with system users)
 RUN groupadd -g 1001 sandbox && \
     useradd -m -u 1001 -g 1001 -s /bin/bash sandbox
 
-# Switch to sandbox user for installations
-USER sandbox
-
-# Install opencode CLI using go install
-# This installs to /home/sandbox/go/bin
-RUN go install github.com/opencode-ai/opencode@latest
-
-# Ensure opencode is in PATH
-ENV PATH="/home/sandbox/go/bin:${PATH}"
-
 # Copy the local opencode-config repository into the image
-# This is done as root first so we can run the bootstrap script
-USER root
 COPY --chown=sandbox:sandbox . /home/sandbox/opencode-config/
 
-# Run bootstrap script as sandbox user
+# Configure git to trust the repository directory and run bootstrap script as root
+RUN git config --global --add safe.directory /home/sandbox/opencode-config && \
+    /home/sandbox/opencode-config/sandbox/bootstrap.sh
+
+# Switch to sandbox user
 USER sandbox
-RUN /home/sandbox/opencode-config/sandbox/bootstrap.sh
 
 # Set working directory to /workspace (will be bind-mounted at runtime)
 WORKDIR /workspace
