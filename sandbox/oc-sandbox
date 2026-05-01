@@ -162,7 +162,7 @@ if [[ "$WORKSPACE_PATH" != "$HOME"* ]]; then
     warn "PATH is outside your home directory."
     # Skip confirmation if not running in a terminal
     if [ ! -t 0 ]; then
-        error "PATH is outside home directory and stdin is not a terminal. Use --force to skip confirmation or run from within home directory."
+        error "PATH is outside home directory and stdin is not a terminal. Run from within your home directory."
     fi
     read -r -p "Continue? [y/N] " response
     if [[ "$response" != "y" && "$response" != "Y" ]]; then
