@@ -46,7 +46,7 @@ assert_stderr_contains() {
     local output="$1"
     local pattern="$2"
     local description="$3"
-    if echo "$output" | grep -q "$pattern"; then
+    if printf '%s' "$output" | grep -q "$pattern"; then
         pass "$description"
     else
         fail "$description (expected pattern: '$pattern')"
@@ -86,7 +86,7 @@ echo ""
 
 echo "--- Test: No profile specified ---"
 
-OUTPUT=$("$OC_SANDBOX" 2>&1) || true
+OUTPUT=$("$OC_SANDBOX" 2>&1)
 EXIT_CODE=$?
 # Should exit with error (non-zero)
 if [ "$EXIT_CODE" -ne 0 ]; then
@@ -105,7 +105,7 @@ echo "--- Test: Invalid profile ---"
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # This test requires podman and a built image
     # Build the image first if needed
-    OUTPUT=$("$OC_SANDBOX" --profile nonexistent --build 2>&1) || true
+    OUTPUT=$("$OC_SANDBOX" --profile nonexistent --build 2>&1)
     EXIT_CODE=$?
     if [ "$EXIT_CODE" -ne 0 ]; then
         pass "oc-sandbox with invalid profile exits with error"
@@ -123,7 +123,7 @@ echo ""
 
 echo "--- Test: Path doesn't exist ---"
 
-OUTPUT=$("$OC_SANDBOX" --profile dev /nonexistent/path/xyz 2>&1) || true
+OUTPUT=$("$OC_SANDBOX" --profile dev /nonexistent/path/xyz 2>&1)
 EXIT_CODE=$?
 if [ "$EXIT_CODE" -ne 0 ]; then
     pass "oc-sandbox with nonexistent path exits with error"
@@ -140,8 +140,8 @@ echo "--- Test: Path is not a directory ---"
 
 NOT_DIR="${TEST_DIR}/not_a_dir"
 touch "$NOT_DIR"
-OUTPUT=$("$OC_SANDBOX" --profile dev "$NOT_DIR" 2>&1) || true
-EXIT_CODE=$?
+    OUTPUT=$("$OC_SANDBOX" --profile dev "$NOT_DIR" 2>&1)
+    EXIT_CODE=$?
 if [ "$EXIT_CODE" -ne 0 ]; then
     pass "oc-sandbox with non-directory path exits with error"
 else
@@ -157,7 +157,7 @@ echo "--- Test: Outside home directory warning ---"
 
 # This test is interactive (prompts for confirmation), so we test the non-interactive path
 # by piping 'n' to reject the warning
-OUTPUT=$(echo "n" | "$OC_SANDBOX" --profile dev /tmp 2>&1) || true
+OUTPUT=$(echo "n" | "$OC_SANDBOX" --profile dev /tmp 2>&1)
 EXIT_CODE=$?
 if [ "$EXIT_CODE" -eq 0 ]; then
     # User chose to abort, exit code should be 0 (clean exit)
@@ -217,8 +217,6 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             --user sandbox \
             --cap-drop ALL \
             --cap-add CHOWN \
-            --cap-add SETUID \
-            --cap-add SETGID \
             --security-opt no-new-privileges:true \
             --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
             "$IMAGE_NAME" \
@@ -236,8 +234,6 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             --user sandbox \
             --cap-drop ALL \
             --cap-add CHOWN \
-            --cap-add SETUID \
-            --cap-add SETGID \
             --security-opt no-new-privileges:true \
             --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
             "$IMAGE_NAME" \
@@ -255,8 +251,6 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             --user sandbox \
             --cap-drop ALL \
             --cap-add CHOWN \
-            --cap-add SETUID \
-            --cap-add SETGID \
             --security-opt no-new-privileges:true \
             --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
             "$IMAGE_NAME" \
@@ -290,8 +284,6 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             --user sandbox \
             --cap-drop ALL \
             --cap-add CHOWN \
-            --cap-add SETUID \
-            --cap-add SETGID \
             --security-opt no-new-privileges:true \
             --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
             "$IMAGE_NAME" \
@@ -310,8 +302,6 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
             --user sandbox \
             --cap-drop ALL \
             --cap-add CHOWN \
-            --cap-add SETUID \
-            --cap-add SETGID \
             --security-opt no-new-privileges:true \
             --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
             "$IMAGE_NAME" \
