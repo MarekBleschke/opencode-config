@@ -12,9 +12,6 @@ permission:
     "git push *": deny
     "git commit *": deny
   question: allow
-  skill:
-    "*": ask
-    brainstorming: allow
 ---
 
 Produce implementation-ready specifications through collaborative dialogue — no implementation code.
