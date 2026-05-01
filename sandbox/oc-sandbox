@@ -135,6 +135,11 @@ done
 # Check podman availability
 check_podman
 
+# Validate Containerfile exists
+if [ ! -f "$CONTAINERFILE" ]; then
+    error "Containerfile not found at: $CONTAINERFILE"
+fi
+
 # Default workspace path to current directory
 if [ -z "$WORKSPACE_PATH" ]; then
     WORKSPACE_PATH="$(pwd)"
@@ -155,6 +160,10 @@ fi
 # Warn if path is outside home directory
 if [[ "$WORKSPACE_PATH" != "$HOME"* ]]; then
     warn "PATH is outside your home directory."
+    # Skip confirmation if not running in a terminal
+    if [ ! -t 0 ]; then
+        error "PATH is outside home directory and stdin is not a terminal. Use --force to skip confirmation or run from within home directory."
+    fi
     read -r -p "Continue? [y/N] " response
     if [[ "$response" != "y" && "$response" != "Y" ]]; then
         echo "Aborted."
@@ -176,6 +185,11 @@ if [ -z "$PROFILE" ]; then
     exit 1
 fi
 
+# Validate profile name doesn't contain path traversal characters
+if [[ "$PROFILE" =~ [/\\.] ]]; then
+    error "Profile name must not contain '/', '\\', or '.' characters."
+fi
+
 validate_profile "$PROFILE"
 
 # --- Launch container ---
@@ -195,8 +209,6 @@ podman run \
     --user sandbox \
     --cap-drop ALL \
     --cap-add CHOWN \
-    --cap-add SETUID \
-    --cap-add SETGID \
     --security-opt no-new-privileges:true \
     --mount type=bind,src="${WORKSPACE_PATH}",dst=/workspace,relabel=private \
     --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${PROFILE}" \
