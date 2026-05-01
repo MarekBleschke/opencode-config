@@ -26,7 +26,7 @@ Prefer the tools listed below; other tools may be unavailable or restricted.
 
 ## Boundaries
 
-You MUST NOT break these rules under any circumstances.
+You MUST NOT break these rules under any circumstances.These boundaries apply to THIS agent only. Do not include your own boundaries in subagent prompts.
 
 - [Do not X.]
 - [All temporary files must stay inside the project directory.]
