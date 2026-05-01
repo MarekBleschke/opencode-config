@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# oc-sandbox - Run opencode in a containerized sandbox
+# Provides filesystem isolation and permission escalation protection
+
+IMAGE_NAME="${OC_SANDBOX_IMAGE:-localhost/opencode-sandbox:latest}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTAINERFILE="${SCRIPT_DIR}/Containerfile"
+
+# Terminal colors
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+usage() {
+    cat <<EOF
+Usage: oc-sandbox [OPTIONS] [PATH]
+
+Run opencode in a containerized sandbox with filesystem isolation.
+
+Options:
+    -p, --profile <name>   Select opencode profile to use (required)
+    -b, --build            Force rebuild of the container image
+    -h, --help             Show this help message
+
+Arguments:
+    PATH   Directory to mount as /workspace (default: current working directory)
+
+Examples:
+    oc-sandbox --profile web-dev                    # Use web-dev profile, current dir as workspace
+    oc-sandbox -p systems ~/projects/my-system      # Use systems profile, specific project dir
+    oc-sandbox -p web-dev --build                    # Force rebuild image before launching
+EOF
+}
+
+error() {
+    echo -e "${RED}Error: $1${NC}" >&2
+    exit 1
+}
+
+warn() {
+    echo -e "${YELLOW}Warning: $1${NC}" >&2
+}
+
+info() {
+    echo -e "${GREEN}$1${NC}"
+}
+
+# Check if podman is installed
+check_podman() {
+    if ! command -v podman &>/dev/null; then
+        error "podman not found. Please install podman."
+    fi
+}
+
+# Build the container image
+build_image() {
+    local force="${1:-false}"
+
+    if [ "$force" = "true" ] || ! podman image exists "$IMAGE_NAME" 2>/dev/null; then
+        info "Building container image..."
+        if ! podman build -t "$IMAGE_NAME" -f "$CONTAINERFILE" "$SCRIPT_DIR"; then
+            error "Container build failed. See output above for details."
+        fi
+        info "Image built successfully."
+    else
+        info "Using existing image: $IMAGE_NAME"
+    fi
+}
+
+# List available profiles from the container image
+list_profiles() {
+    local profiles
+    profiles=$(podman run --rm "$IMAGE_NAME" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+    if [ -z "$profiles" ]; then
+        echo "  (no profiles found)"
+    else
+        echo "$profiles" | while read -r profile; do
+            echo "  - $profile"
+        done
+    fi
+}
+
+# Validate that a profile exists in the container image
+validate_profile() {
+    local profile="$1"
+    if ! podman run --rm "$IMAGE_NAME" test -d "/home/sandbox/opencode-config/profiles/$profile" 2>/dev/null; then
+        echo -e "${RED}Error: Invalid profile: '$profile'${NC}" >&2
+        echo "" >&2
+        echo "Available profiles:" >&2
+        list_profiles >&2
+        exit 1
+    fi
+}
+
+# Parse command-line arguments
+PROFILE=""
+WORKSPACE_PATH=""
+FORCE_BUILD="false"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -p|--profile)
+            if [ -z "${2:-}" ]; then
+                error "Option --profile requires a value."
+            fi
+            PROFILE="$2"
+            shift 2
+            ;;
+        -b|--build)
+            FORCE_BUILD="true"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            error "Unknown option: $1\nUse --help for usage information."
+            ;;
+        *)
+            if [ -n "$WORKSPACE_PATH" ]; then
+                error "Multiple paths specified. Only one PATH argument is allowed."
+            fi
+            WORKSPACE_PATH="$1"
+            shift
+            ;;
+    esac
+done
+
+# --- Validation (fast checks first, before building image) ---
+
+# Check podman availability
+check_podman
+
+# Default workspace path to current directory
+if [ -z "$WORKSPACE_PATH" ]; then
+    WORKSPACE_PATH="$(pwd)"
+fi
+
+# Resolve to absolute path and validate existence
+if [ ! -e "$WORKSPACE_PATH" ]; then
+    error "PATH does not exist: $WORKSPACE_PATH"
+fi
+
+WORKSPACE_PATH="$(cd "$WORKSPACE_PATH" && pwd)"
+
+# Validate path is a directory
+if [ ! -d "$WORKSPACE_PATH" ]; then
+    error "PATH is not a directory: $WORKSPACE_PATH"
+fi
+
+# Warn if path is outside home directory
+if [[ "$WORKSPACE_PATH" != "$HOME"* ]]; then
+    warn "PATH is outside your home directory."
+    read -r -p "Continue? [y/N] " response
+    if [[ "$response" != "y" && "$response" != "Y" ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+fi
+
+# --- Image build (needed for profile operations) ---
+
+build_image "$FORCE_BUILD"
+
+# --- Profile validation ---
+
+if [ -z "$PROFILE" ]; then
+    echo -e "${RED}Error: No profile specified. Use --profile <name> to select a profile.${NC}" >&2
+    echo "" >&2
+    echo "Available profiles:" >&2
+    list_profiles >&2
+    exit 1
+fi
+
+validate_profile "$PROFILE"
+
+# --- Launch container ---
+
+info "Starting opencode sandbox"
+echo "  Profile:   $PROFILE"
+echo "  Workspace: $WORKSPACE_PATH"
+echo "  Image:     $IMAGE_NAME"
+echo ""
+
+podman run \
+    --rm \
+    --interactive \
+    --tty \
+    --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+    --user sandbox \
+    --cap-drop ALL \
+    --cap-add CHOWN \
+    --cap-add SETUID \
+    --cap-add SETGID \
+    --security-opt no-new-privileges:true \
+    --mount type=bind,src="${WORKSPACE_PATH}",dst=/workspace,relabel=private \
+    --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${PROFILE}" \
+    "$IMAGE_NAME" \
+    opencode
