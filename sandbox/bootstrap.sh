@@ -23,8 +23,8 @@ fi
 echo "Verifying submodule symlinks..."
 # The dev profile uses symlinks that point into submodules
 # After submodule init, these should resolve
-if [ ! -f "profiles/dev/opencode.json" ]; then
-    echo "Error: dev profile opencode.json not found (submodules may not be fully initialized)" >&2
+if [ ! -f "profiles/dev/plugins/superpowers.js" ]; then
+    echo "Error: superpowers plugin symlink not resolved (submodules may not be fully initialized)" >&2
     exit 1
 fi
 
