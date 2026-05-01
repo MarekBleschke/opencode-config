@@ -1,0 +1,43 @@
+FROM ubuntu:24.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies and clean up in a single layer to reduce image size
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        git \
+        golang-go \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install opencode CLI
+# Uses the official install script; adjust the URL if a different installation method is needed
+RUN curl -fsSL https://opencode.ai/install.sh | bash
+
+# Ensure opencode is in PATH
+ENV PATH="/usr/local/bin:/home/sandbox/.local/bin:${PATH}"
+
+# Create sandbox user (uid 1000, gid 1000) with no sudo access
+RUN groupadd -g 1000 sandbox && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash sandbox
+
+# Clone opencode-config repository
+# Uses HTTPS for compatibility; no SSH keys required during build
+RUN git clone https://github.com/MarekBleschke/opencode-config.git /home/sandbox/opencode-config
+
+# Run bootstrap script to initialize submodules and verify structure
+RUN /home/sandbox/opencode-config/sandbox/bootstrap.sh
+
+# Set ownership of /home/sandbox contents to sandbox user
+RUN chown -R sandbox:sandbox /home/sandbox
+
+# Set working directory to /workspace (will be bind-mounted at runtime)
+WORKDIR /workspace
+
+# Run as sandbox user by default
+USER sandbox
+
+# Default command
+CMD ["opencode"]
