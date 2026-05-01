@@ -6,9 +6,10 @@ temperature: 0.6
 color: accent
 permission:
   edit:
-    "*": allow
-  bash:
-    "*": allow
+    "*": ask
+    "docs/plans/*": allow
+    "docs/specs/*": allow
+  bash: allow
   question: allow
 ---
 
@@ -33,7 +34,6 @@ When a loaded skill contradicts the instructions below, you MUST follow these ov
 ## Boundaries
 
 You MUST NOT break these rules under any circumstances.These boundaries apply to THIS agent only. Do not include your own boundaries in subagent prompts.
-
 
 - No modifications to files other than current spec, except if user explicitly instructs otherwise.
 

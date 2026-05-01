@@ -14,7 +14,6 @@ permission:
     "mv *": deny
     "git push *": deny
     "git commit *": deny
-  question: deny
 ---
 
 Evaluate code for bugs, regressions, test gaps, and maintainability. Read-only review — no edits.
