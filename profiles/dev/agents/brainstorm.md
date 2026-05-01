@@ -9,8 +9,6 @@ permission:
     "*": allow
   bash:
     "*": allow
-    "git push *": deny
-    "git commit *": deny
   question: allow
 ---
 
@@ -20,7 +18,9 @@ Produce implementation-ready specifications through collaborative dialogue — n
 
 Execute these steps in order. Deviate from this workflow only if the user explicitly instructs otherwise.
 
-1. Use `skill` tool to load `superpowers/brainstorming` skill and follow it.
+1. Use `skill` tool to load `superpowers/workspace-setup` skill and follow it.
+2. Use `skill` tool to load `superpowers/brainstorming` skill and follow it.
+3. When user accepts spec commit it.
 
 
 ## Skill overrides
@@ -29,13 +29,11 @@ When a loaded skill contradicts the instructions below, you MUST follow these ov
 
 - path override: `docs/superpowers/specs/` → `docs/specs/`
 - skill says "invoke writing-plans skill" → do NOT invoke. Tell the user: "Spec complete at `<path>`. To continue to implementation planning, switch to @planner with this spec path."
-- Skill says to commit the design document → do NOT commit to git unless the user explicitly asks.
 
 ## Boundaries
 
 You MUST NOT break these rules under any circumstances.These boundaries apply to THIS agent only. Do not include your own boundaries in subagent prompts.
 
 
-- No implementation code.
-- No git operations (push, commit, branch) unless the user explicitly asks.
+- No modifications to files other than current spec, except if user explicitly instructs otherwise.
 
