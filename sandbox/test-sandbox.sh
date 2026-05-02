@@ -71,50 +71,103 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 echo "Test directory: $TEST_DIR"
 echo ""
 
-# --- Test: Help flag ---
+# --- Test 1: Help display (no args) ---
 
-echo "--- Test: Help flag ---"
+echo "--- Test 1: Help display (no args) ---"
+
+OUTPUT=$("$OC_SANDBOX" 2>&1) || true
+assert_exit_code 0 $? "oc-sandbox with no args exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Help output contains usage"
+assert_stderr_contains "$OUTPUT" "build" "Help output mentions build command"
+assert_stderr_contains "$OUTPUT" "run" "Help output mentions run command"
+
+echo ""
+
+# --- Test 2: Main help flag ---
+
+echo "--- Test 2: Main help flag ---"
 
 OUTPUT=$("$OC_SANDBOX" --help 2>&1) || true
 assert_exit_code 0 $? "oc-sandbox --help exits with 0"
-assert_stderr_contains "$OUTPUT" "Usage:" "Help output contains usage"
-assert_stderr_contains "$OUTPUT" "--profile" "Help output contains --profile option"
+assert_stderr_contains "$OUTPUT" "Usage:" "Main --help contains usage"
 
 echo ""
 
-# --- Test: No profile specified ---
+# --- Test 3: Build help flag ---
 
-echo "--- Test: No profile specified ---"
+echo "--- Test 3: Build help flag ---"
 
-OUTPUT=$("$OC_SANDBOX" 2>&1)
+OUTPUT=$("$OC_SANDBOX" build --help 2>&1) || true
+assert_exit_code 0 $? "oc-sandbox build --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Build --help contains usage"
+assert_stderr_contains "$OUTPUT" "--tag" "Build --help mentions --tag"
+assert_stderr_contains "$OUTPUT" "--force" "Build --help mentions --force"
+
+echo ""
+
+# --- Test 4: Run help flag ---
+
+echo "--- Test 4: Run help flag ---"
+
+OUTPUT=$("$OC_SANDBOX" run --help 2>&1) || true
+assert_exit_code 0 $? "oc-sandbox run --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Run --help contains usage"
+assert_stderr_contains "$OUTPUT" "--tag" "Run --help mentions --tag"
+assert_stderr_contains "$OUTPUT" "--profile" "Run --help mentions --profile"
+
+echo ""
+
+# --- Test 5: Unknown command ---
+
+echo "--- Test 5: Unknown command ---"
+
+OUTPUT=$("$OC_SANDBOX" unknown 2>&1)
 EXIT_CODE=$?
-# Should exit with error (non-zero)
 if [ "$EXIT_CODE" -ne 0 ]; then
-  pass "oc-sandbox without profile exits with error"
+  pass "oc-sandbox with unknown command exits with error"
 else
-  fail "oc-sandbox without profile should exit with error"
+  fail "oc-sandbox with unknown command should exit with error"
 fi
-assert_stderr_contains "$OUTPUT" "No profile specified" "Error message mentions missing profile"
+assert_stderr_contains "$OUTPUT" "Unknown command" "Error mentions unknown command"
 
 echo ""
 
-# --- Test: Invalid profile ---
+# --- Test 6: Run without image (requires podman) ---
 
-echo "--- Test: Invalid profile ---"
+echo "--- Test 6: Run without image ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="${OC_SANDBOX_IMAGE:-localhost/opencode-sandbox:latest}"
+  # Use a tag that is unlikely to exist
+  OUTPUT=$("$OC_SANDBOX" run --tag nonexistent-tag-12345 2>&1)
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -ne 0 ]; then
+    pass "oc-sandbox run without image exits with error"
+  else
+    fail "oc-sandbox run without image should exit with error"
+  fi
+  assert_stderr_contains "$OUTPUT" "not found" "Error mentions image not found"
+  assert_stderr_contains "$OUTPUT" "oc-sandbox build" "Error suggests running build"
+else
+  skip "Run without image (podman not available)"
+fi
+
+echo ""
+
+# --- Test 7: Run with invalid profile (path traversal) ---
+
+echo "--- Test 7: Run with invalid profile (path traversal) ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
-    # Test with a profile name that has invalid characters (path traversal)
-    # This validates before image operations
-    OUTPUT=$("$OC_SANDBOX" --profile "invalid/profile" 2>&1)
+    OUTPUT=$("$OC_SANDBOX" run --profile "invalid/profile" 2>&1)
     EXIT_CODE=$?
     if [ "$EXIT_CODE" -ne 0 ]; then
-      pass "oc-sandbox with invalid profile exits with error"
+      pass "oc-sandbox run with invalid profile exits with error"
     else
-      fail "oc-sandbox with invalid profile should exit with error"
+      fail "oc-sandbox run with invalid profile should exit with error"
     fi
-    assert_stderr_contains "$OUTPUT" "Profile name must not contain" "Error message mentions invalid profile"
+    assert_stderr_contains "$OUTPUT" "Profile name must not contain" "Error mentions invalid profile characters"
   else
     skip "Invalid profile test (image not built)"
   fi
@@ -124,96 +177,139 @@ fi
 
 echo ""
 
-# --- Test: Path doesn't exist ---
+# --- Test 8: Run with nonexistent path ---
 
-echo "--- Test: Path doesn't exist ---"
-
-OUTPUT=$("$OC_SANDBOX" --profile dev /nonexistent/path/xyz 2>&1)
-EXIT_CODE=$?
-if [ "$EXIT_CODE" -ne 0 ]; then
-  pass "oc-sandbox with nonexistent path exits with error"
-else
-  fail "oc-sandbox with nonexistent path should exit with error"
-fi
-assert_stderr_contains "$OUTPUT" "does not exist" "Error message mentions nonexistent path"
-
-echo ""
-
-# --- Test: Path is not a directory ---
-
-echo "--- Test: Path is not a directory ---"
-
-NOT_DIR="${TEST_DIR}/not_a_dir"
-touch "$NOT_DIR"
-OUTPUT=$("$OC_SANDBOX" --profile dev "$NOT_DIR" 2>&1)
-EXIT_CODE=$?
-if [ "$EXIT_CODE" -ne 0 ]; then
-  pass "oc-sandbox with non-directory path exits with error"
-else
-  fail "oc-sandbox with non-directory path should exit with error"
-fi
-assert_stderr_contains "$OUTPUT" "not a directory" "Error message mentions not a directory"
-
-echo ""
-
-# --- Test: Outside home directory warning ---
-
-echo "--- Test: Outside home directory warning ---"
-
-# This test is interactive (prompts for confirmation), so we test the non-interactive path
-# by piping 'n' to reject the warning
-OUTPUT=$(echo "n" | "$OC_SANDBOX" --profile dev /tmp 2>&1)
-EXIT_CODE=$?
-if [ "$EXIT_CODE" -ne 0 ]; then
-  # When stdin is not a terminal, script errors out
-  pass "oc-sandbox errors when outside-home and non-interactive"
-else
-  fail "oc-sandbox should exit with error for outside-home non-interactive"
-fi
-assert_stderr_contains "$OUTPUT" "outside your home directory" "Warning mentions home directory"
-
-echo ""
-
-# --- Test: Basic invocation (requires podman) ---
-
-echo "--- Test: Basic invocation ---"
+echo "--- Test 8: Run with nonexistent path ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  # This test requires a built image and is interactive
-  # We test that the container starts and exits cleanly
-  # Use 'echo exit | oc-sandbox' to send exit command to opencode
-  # Note: This test may need adjustment based on how opencode handles stdin
-  skip "Basic invocation test (interactive, run manually: oc-sandbox --profile dev)"
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    OUTPUT=$("$OC_SANDBOX" run /nonexistent/path/xyz 2>&1)
+    EXIT_CODE=$?
+    if [ "$EXIT_CODE" -ne 0 ]; then
+      pass "oc-sandbox run with nonexistent path exits with error"
+    else
+      fail "oc-sandbox run with nonexistent path should exit with error"
+    fi
+    assert_stderr_contains "$OUTPUT" "does not exist" "Error message mentions nonexistent path"
+  else
+    skip "Nonexistent path test (image not built)"
+  fi
 else
-  skip "Basic invocation test (podman not available)"
+  skip "Nonexistent path test (podman not available)"
 fi
 
 echo ""
 
-# --- Test: Custom path (requires podman) ---
+# --- Test 9: Run with non-directory path ---
 
-echo "--- Test: Custom path ---"
+echo "--- Test 9: Run with non-directory path ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  skip "Custom path test (interactive, run manually: oc-sandbox -p systems /path/to/project)"
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    NOT_DIR="${TEST_DIR}/not_a_dir"
+    touch "$NOT_DIR"
+    OUTPUT=$("$OC_SANDBOX" run "$NOT_DIR" 2>&1)
+    EXIT_CODE=$?
+    if [ "$EXIT_CODE" -ne 0 ]; then
+      pass "oc-sandbox run with non-directory path exits with error"
+    else
+      fail "oc-sandbox run with non-directory path should exit with error"
+    fi
+    assert_stderr_contains "$OUTPUT" "not a directory" "Error message mentions not a directory"
+  else
+    skip "Non-directory path test (image not built)"
+  fi
 else
-  skip "Custom path test (podman not available)"
+  skip "Non-directory path test (podman not available)"
 fi
 
 echo ""
 
-# --- Test: Filesystem isolation (requires podman) ---
+# --- Test 10: Outside home directory warning (non-interactive) ---
 
-echo "--- Test: Filesystem isolation ---"
+echo "--- Test 10: Outside home directory warning (non-interactive) ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  # Verify that the container cannot write outside /workspace and /tmp
-  # Run a command inside the container that tries to write to /
-  IMAGE_NAME="${OC_SANDBOX_IMAGE:-localhost/opencode-sandbox:latest}"
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    # Pipe 'n' to simulate non-interactive stdin rejecting the prompt
+    OUTPUT=$(echo "n" | "$OC_SANDBOX" run /tmp 2>&1)
+    EXIT_CODE=$?
+    if [ "$EXIT_CODE" -ne 0 ]; then
+      pass "oc-sandbox run errors when outside-home and non-interactive"
+    else
+      fail "oc-sandbox run should exit with error for outside-home non-interactive"
+    fi
+    assert_stderr_contains "$OUTPUT" "outside your home directory" "Warning mentions home directory"
+  else
+    skip "Outside home directory test (image not built)"
+  fi
+else
+  skip "Outside home directory test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 11: Build command (requires podman) ---
+
+echo "--- Test 11: Build command ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  # Force rebuild to ensure it works
+  OUTPUT=$("$OC_SANDBOX" build --force 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --force exits with 0"
+  assert_stderr_contains "$OUTPUT" "built successfully" "Build output mentions success"
+else
+  skip "Build command (podman not available)"
+fi
+
+echo ""
+
+# --- Test 12: Build skip if exists (requires podman) ---
+
+echo "--- Test 12: Build skip if exists ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  # After the force build above, a plain build should skip
+  OUTPUT=$("$OC_SANDBOX" build 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build without --force exits with 0 when image exists"
+  assert_stderr_contains "$OUTPUT" "already exists" "Build skip mentions image already exists"
+else
+  skip "Build skip if exists (podman not available)"
+fi
+
+echo ""
+
+# --- Test 13: Build with custom tag (requires podman) ---
+
+echo "--- Test 13: Build with custom tag ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  OUTPUT=$("$OC_SANDBOX" build --tag test-integration --force 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --tag test-integration exits with 0"
+  assert_stderr_contains "$OUTPUT" "localhost/opencode-sandbox:test-integration" "Build output mentions custom tag"
+else
+  skip "Build with custom tag (podman not available)"
+fi
+
+echo ""
+
+# --- Test 14: Filesystem isolation (requires podman) ---
+
+echo "--- Test 14: Filesystem isolation ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     # Test writing to / (should fail)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -230,7 +326,8 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
 
     # Test writing to /workspace (should succeed)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -247,7 +344,8 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
 
     # Test writing to /tmp (should succeed)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -261,6 +359,24 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     else
       fail "Container should be able to write to /tmp"
     fi
+
+    # Test writing to /home/sandbox (should succeed)
+    OUTPUT=$(podman run --rm --read-only \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "touch /home/sandbox/test_write && echo success || echo failure") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "success"; then
+      pass "Container can write to /home/sandbox"
+    else
+      fail "Container should be able to write to /home/sandbox"
+    fi
   else
     skip "Filesystem isolation test (image not built)"
   fi
@@ -270,17 +386,18 @@ fi
 
 echo ""
 
-# --- Test: Permission escalation prevention (requires podman) ---
+# --- Test 15: Permission escalation prevention (requires podman) ---
 
-echo "--- Test: Permission escalation prevention ---"
+echo "--- Test 15: Permission escalation prevention ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="${OC_SANDBOX_IMAGE:-localhost/opencode-sandbox:latest}"
+  IMAGE_NAME="localhost/opencode-sandbox:main"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
-    # Test that sandbox user cannot become root
+    # Test that container runs as sandbox user
     OUTPUT=$(podman run --rm \
       --read-only \
-      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -295,10 +412,11 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
       fail "Container should run as sandbox user, got: $OUTPUT"
     fi
 
-    # Test that su/sudo are not available
+    # Test that sudo is not available
     OUTPUT=$(podman run --rm \
       --read-only \
-      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -321,6 +439,61 @@ fi
 
 echo ""
 
+# --- Test 16: Persistent home directory (requires podman) ---
+
+echo "--- Test 16: Persistent home directory ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    VOLUME_NAME="opencode-sandbox-home-main"
+
+    # Write a marker file into the home volume
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "${VOLUME_NAME}:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "echo marker123 > /home/sandbox/.test_marker && echo written") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "written"; then
+      pass "Marker file written to persistent home"
+    else
+      fail "Failed to write marker file to persistent home: $OUTPUT"
+    fi
+
+    # Run a second container and verify the marker persists
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,nosuid,size=100m \
+      --volume "${VOLUME_NAME}:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "cat /home/sandbox/.test_marker 2>/dev/null || echo 'not found'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "marker123"; then
+      pass "Marker file persists across container runs"
+    else
+      fail "Marker file should persist across container runs, got: $OUTPUT"
+    fi
+  else
+    skip "Persistent home test (image not built)"
+  fi
+else
+  skip "Persistent home test (podman not available)"
+fi
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="
@@ -336,4 +509,3 @@ else
   echo -e "${GREEN}All tests passed (or skipped).${NC}"
   exit 0
 fi
-
