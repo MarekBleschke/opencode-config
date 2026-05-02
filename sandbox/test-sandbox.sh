@@ -984,6 +984,52 @@ fi
 
 echo ""
 
+# --- Test 31: Symlink resolution ---
+
+echo "--- Test 31: Symlink resolution ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  SYMLINK_DIR="${TEST_DIR}/symlink_test"
+  mkdir -p "$SYMLINK_DIR"
+  ln -s "$OC_SANDBOX" "${SYMLINK_DIR}/oc-sandbox"
+
+  OUTPUT=$("${SYMLINK_DIR}/oc-sandbox" build --help 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "Symlinked oc-sandbox build --help exits with 0"
+  assert_stderr_contains "$OUTPUT" "Usage:" "Symlinked build --help shows usage"
+  assert_stderr_contains "$OUTPUT" "--tag" "Symlinked build --help mentions --tag"
+
+  # Verify that SCRIPT_DIR resolves correctly by checking build can find Containerfile
+  # We do this indirectly: the real script is in a directory with Containerfile,
+  # so if SCRIPT_DIR resolved to the symlink dir, build --help would still work
+  # but a real build would fail. We test the real build via symlink in Test 32.
+  pass "Symlink resolution: build --help works through symlink"
+else
+  skip "Symlink resolution (podman not available)"
+fi
+
+echo ""
+
+# --- Test 32: Build through symlink (requires podman) ---
+
+echo "--- Test 32: Build through symlink ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  SYMLINK_BUILD_DIR="${TEST_DIR}/symlink_build"
+  mkdir -p "$SYMLINK_BUILD_DIR"
+  ln -s "$OC_SANDBOX" "${SYMLINK_BUILD_DIR}/oc-sandbox"
+
+  # Use a unique tag so we don't interfere with other tests
+  OUTPUT=$("${SYMLINK_BUILD_DIR}/oc-sandbox" build --tag symlink-test --force 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "Build through symlink exits with 0"
+  assert_stderr_contains "$OUTPUT" "built successfully" "Build through symlink reports success"
+else
+  skip "Build through symlink (podman not available)"
+fi
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="
