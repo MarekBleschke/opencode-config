@@ -53,6 +53,34 @@ assert_stderr_contains() {
   fi
 }
 
+# Helper: run a command with a timeout, capturing stdout and stderr
+# Returns the command's exit code if it exits before timeout, or 124 if killed by timeout
+run_with_timeout() {
+  local timeout_secs="$1"
+  shift
+  python3 -c "
+import sys, subprocess, signal, time
+timeout = int(sys.argv[1])
+args = sys.argv[2:]
+proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+time.sleep(timeout)
+if proc.poll() is not None:
+    sys.stdout.buffer.write(proc.stdout.read())
+    sys.exit(proc.returncode)
+proc.send_signal(signal.SIGTERM)
+try:
+    proc.wait(timeout=2)
+except subprocess.TimeoutExpired:
+    proc.kill()
+    proc.wait()
+sys.stdout.buffer.write(proc.stdout.read())
+rc = proc.returncode
+if rc < 0:
+    rc = 124
+sys.exit(rc)
+" "$timeout_secs" "$@"
+}
+
 # --- Pre-flight checks ---
 
 echo "=== oc-sandbox integration tests ==="
@@ -493,6 +521,465 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
   fi
 else
   skip "Persistent home test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 17: GitHub SSH known_hosts ---
+
+echo "--- Test 17: GitHub SSH known_hosts ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "grep github.com /home/sandbox/.ssh/known_hosts 2>/dev/null || echo 'not found'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "github.com"; then
+      pass "GitHub host keys present in known_hosts"
+    else
+      fail "GitHub host keys not found in known_hosts: $OUTPUT"
+    fi
+  else
+    skip "GitHub SSH known_hosts test (image not built)"
+  fi
+else
+  skip "GitHub SSH known_hosts test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 18: SSH key mount ---
+
+echo "--- Test 18: SSH key mount ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_18"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key-data" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 600 "${TEMP_HOME}/.ssh/id_rsa"
+
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      --mount type=bind,src="${TEMP_HOME}/.ssh/id_rsa",dst=/home/sandbox/.ssh/id_rsa,ro,readonly,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "cat /home/sandbox/.ssh/id_rsa 2>/dev/null || echo 'not found'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "fake-ssh-key-data"; then
+      pass "SSH key is readable inside container"
+    else
+      fail "SSH key not readable inside container: $OUTPUT"
+    fi
+  else
+    skip "SSH key mount test (image not built)"
+  fi
+else
+  skip "SSH key mount test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 19: SSH key read-only ---
+
+echo "--- Test 19: SSH key read-only ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_19"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key-data" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 600 "${TEMP_HOME}/.ssh/id_rsa"
+
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      --mount type=bind,src="${TEMP_HOME}/.ssh/id_rsa",dst=/home/sandbox/.ssh/id_rsa,ro,readonly,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "echo modified > /home/sandbox/.ssh/id_rsa 2>&1; echo exit_code=\$?") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "exit_code=1\|Permission denied\|Read-only file system"; then
+      pass "Container cannot modify mounted SSH key"
+    else
+      fail "Container should not be able to modify mounted SSH key: $OUTPUT"
+    fi
+  else
+    skip "SSH key read-only test (image not built)"
+  fi
+else
+  skip "SSH key read-only test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 20: SSH public key mount ---
+
+echo "--- Test 20: SSH public key mount ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_20"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key-data" > "${TEMP_HOME}/.ssh/id_rsa"
+    echo "fake-ssh-pub-key-data" > "${TEMP_HOME}/.ssh/id_rsa.pub"
+    chmod 600 "${TEMP_HOME}/.ssh/id_rsa"
+
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      --mount type=bind,src="${TEMP_HOME}/.ssh/id_rsa",dst=/home/sandbox/.ssh/id_rsa,ro,readonly,relabel=private \
+      --mount type=bind,src="${TEMP_HOME}/.ssh/id_rsa.pub",dst=/home/sandbox/.ssh/id_rsa.pub,ro,readonly,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "cat /home/sandbox/.ssh/id_rsa.pub 2>/dev/null || echo 'not found'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "fake-ssh-pub-key-data"; then
+      pass "SSH public key is readable inside container"
+    else
+      fail "SSH public key not readable inside container: $OUTPUT"
+    fi
+  else
+    skip "SSH public key mount test (image not built)"
+  fi
+else
+  skip "SSH public key mount test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 21: Auth.json mount ---
+
+echo "--- Test 21: Auth.json mount ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_21"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      --mount type=bind,src="${TEMP_HOME}/.local/share/opencode/auth.json",dst=/home/sandbox/.local/share/opencode/auth.json,ro,readonly,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "cat /home/sandbox/.local/share/opencode/auth.json 2>/dev/null || echo 'not found'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q '"providers"'; then
+      pass "Auth.json is readable inside container"
+    else
+      fail "Auth.json not readable inside container: $OUTPUT"
+    fi
+  else
+    skip "Auth.json mount test (image not built)"
+  fi
+else
+  skip "Auth.json mount test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 22: Auth.json read-only ---
+
+echo "--- Test 22: Auth.json read-only ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_22"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      --mount type=bind,src="${TEMP_HOME}/.local/share/opencode/auth.json",dst=/home/sandbox/.local/share/opencode/auth.json,ro,readonly,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "echo modified > /home/sandbox/.local/share/opencode/auth.json 2>&1; echo exit_code=\$?") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "exit_code=1\|Permission denied\|Read-only file system"; then
+      pass "Container cannot modify mounted auth.json"
+    else
+      fail "Container should not be able to modify mounted auth.json: $OUTPUT"
+    fi
+  else
+    skip "Auth.json read-only test (image not built)"
+  fi
+else
+  skip "Auth.json read-only test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 23: Missing SSH key warning ---
+
+echo "--- Test 23: Missing SSH key warning ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_23"
+    mkdir -p "${TEMP_HOME}/workspace"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "SSH key not found" "Missing SSH key produces warning"
+  else
+    skip "Missing SSH key warning test (image not built)"
+  fi
+else
+  skip "Missing SSH key warning test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 24: Missing auth.json warning ---
+
+echo "--- Test 24: Missing auth.json warning ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_24"
+    mkdir -p "${TEMP_HOME}/workspace"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 600 "${TEMP_HOME}/.ssh/id_rsa"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "auth.json not found" "Missing auth.json produces warning"
+  else
+    skip "Missing auth.json warning test (image not built)"
+  fi
+else
+  skip "Missing auth.json warning test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 25: --no-ssh flag ---
+
+echo "--- Test 25: --no-ssh flag ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_25"
+    mkdir -p "${TEMP_HOME}/workspace"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 600 "${TEMP_HOME}/.ssh/id_rsa"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run --no-ssh "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "Skipping SSH key mount" "--no-ssh flag skips SSH key mount"
+  else
+    skip "--no-ssh flag test (image not built)"
+  fi
+else
+  skip "--no-ssh flag test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 26: --no-auth flag ---
+
+echo "--- Test 26: --no-auth flag ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_26"
+    mkdir -p "${TEMP_HOME}/workspace"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 600 "${TEMP_HOME}/.ssh/id_rsa"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run --no-auth "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "Skipping auth.json mount" "--no-auth flag skips auth.json mount"
+  else
+    skip "--no-auth flag test (image not built)"
+  fi
+else
+  skip "--no-auth flag test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 27: Permissive SSH key warning ---
+
+echo "--- Test 27: Permissive SSH key warning ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_27"
+    mkdir -p "${TEMP_HOME}/workspace"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 644 "${TEMP_HOME}/.ssh/id_rsa"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "overly permissive permissions" "Permissive SSH key produces warning"
+  else
+    skip "Permissive SSH key warning test (image not built)"
+  fi
+else
+  skip "Permissive SSH key warning test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 28: Unreadable SSH key error ---
+
+echo "--- Test 28: Unreadable SSH key error ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_28"
+    mkdir -p "${TEMP_HOME}/workspace"
+    mkdir -p "${TEMP_HOME}/.ssh"
+    echo "fake-ssh-key" > "${TEMP_HOME}/.ssh/id_rsa"
+    chmod 000 "${TEMP_HOME}/.ssh/id_rsa"
+    mkdir -p "${TEMP_HOME}/.local/share/opencode"
+    echo '{"providers":{"test":"key"}}' > "${TEMP_HOME}/.local/share/opencode/auth.json"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run "$TEMP_HOME/workspace" 2>&1)
+    EXIT_CODE=$?
+
+    if [ "$EXIT_CODE" -ne 0 ]; then
+      pass "Unreadable SSH key causes non-zero exit"
+    else
+      fail "Unreadable SSH key should cause non-zero exit, got $EXIT_CODE"
+    fi
+    assert_stderr_contains "$OUTPUT" "Cannot read SSH key" "Unreadable SSH key produces error message"
+  else
+    skip "Unreadable SSH key error test (image not built)"
+  fi
+else
+  skip "Unreadable SSH key error test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 29: Plugin warmup ---
+
+echo "--- Test 29: Plugin warmup ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "test -d /home/sandbox/.config/opencode/node_modules && echo 'warmup_done' || echo 'no_warmup'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "warmup_done"; then
+      pass "Plugin warmup created opencode files in home directory"
+    else
+      fail "Plugin warmup did not create opencode files: $OUTPUT"
+    fi
+  else
+    skip "Plugin warmup test (image not built)"
+  fi
+else
+  skip "Plugin warmup test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 30: Git SSH clone ---
+
+echo "--- Test 30: Git SSH clone ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "if ! command -v git >/dev/null 2>&1 || ! command -v ssh >/dev/null 2>&1; then echo 'missing_tools'; exit 1; fi; GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=yes' git clone git@github.com:some/nonexistent-repo-12345.git /tmp/test_clone 2>&1 || true") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "missing_tools"; then
+      fail "Git or SSH not available in container"
+    elif printf '%s' "$OUTPUT" | grep -q "Host key verification failed"; then
+      fail "Git SSH clone failed with host key verification: $OUTPUT"
+    else
+      pass "Git SSH clone works without host key prompt"
+    fi
+  else
+    skip "Git SSH clone test (image not built)"
+  fi
+else
+  skip "Git SSH clone test (podman not available)"
 fi
 
 echo ""
