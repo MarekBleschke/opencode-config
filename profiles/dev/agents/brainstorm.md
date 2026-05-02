@@ -1,6 +1,6 @@
 ---
 description: "Design and spec agent for creative work before implementation. Design/spec work only. No implementation."
-model: opencode-go/kimi-k2.5
+model: opencode-go/glm-5.1
 mode: primary
 temperature: 0.6
 color: accent

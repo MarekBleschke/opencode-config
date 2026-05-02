@@ -1,6 +1,6 @@
 ---
 description: "Implementation agent for complex, architectural coding tasks. Multi-file coordination, design decisions, large refactors. Code execution only. Stay in provided scope."
-model: opencode-go/glm-5.1
+model: opencode-go/kimi-k2.6
 mode: subagent
 hidden: true
 temperature: 0.2
