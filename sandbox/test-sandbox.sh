@@ -75,7 +75,7 @@ echo ""
 
 echo "--- Test 1: Help display (no args) ---"
 
-OUTPUT=$("$OC_SANDBOX" 2>&1) || true
+OUTPUT=$("$OC_SANDBOX" 2>&1)
 exit_code=$?
 assert_exit_code 0 $exit_code "oc-sandbox with no args exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Help output contains usage"
@@ -88,7 +88,7 @@ echo ""
 
 echo "--- Test 2: Main help flag ---"
 
-OUTPUT=$("$OC_SANDBOX" --help 2>&1) || true
+OUTPUT=$("$OC_SANDBOX" --help 2>&1)
 exit_code=$?
 assert_exit_code 0 $exit_code "oc-sandbox --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Main --help contains usage"
@@ -99,7 +99,7 @@ echo ""
 
 echo "--- Test 3: Build help flag ---"
 
-OUTPUT=$("$OC_SANDBOX" build --help 2>&1) || true
+OUTPUT=$("$OC_SANDBOX" build --help 2>&1)
 exit_code=$?
 assert_exit_code 0 $exit_code "oc-sandbox build --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Build --help contains usage"
@@ -112,7 +112,7 @@ echo ""
 
 echo "--- Test 4: Run help flag ---"
 
-OUTPUT=$("$OC_SANDBOX" run --help 2>&1) || true
+OUTPUT=$("$OC_SANDBOX" run --help 2>&1)
 exit_code=$?
 assert_exit_code 0 $exit_code "oc-sandbox run --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Run --help contains usage"
