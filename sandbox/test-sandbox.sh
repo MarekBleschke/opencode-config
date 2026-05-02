@@ -76,7 +76,8 @@ echo ""
 echo "--- Test 1: Help display (no args) ---"
 
 OUTPUT=$("$OC_SANDBOX" 2>&1) || true
-assert_exit_code 0 $? "oc-sandbox with no args exits with 0"
+exit_code=$?
+assert_exit_code 0 $exit_code "oc-sandbox with no args exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Help output contains usage"
 assert_stderr_contains "$OUTPUT" "build" "Help output mentions build command"
 assert_stderr_contains "$OUTPUT" "run" "Help output mentions run command"
@@ -88,7 +89,8 @@ echo ""
 echo "--- Test 2: Main help flag ---"
 
 OUTPUT=$("$OC_SANDBOX" --help 2>&1) || true
-assert_exit_code 0 $? "oc-sandbox --help exits with 0"
+exit_code=$?
+assert_exit_code 0 $exit_code "oc-sandbox --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Main --help contains usage"
 
 echo ""
@@ -98,7 +100,8 @@ echo ""
 echo "--- Test 3: Build help flag ---"
 
 OUTPUT=$("$OC_SANDBOX" build --help 2>&1) || true
-assert_exit_code 0 $? "oc-sandbox build --help exits with 0"
+exit_code=$?
+assert_exit_code 0 $exit_code "oc-sandbox build --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Build --help contains usage"
 assert_stderr_contains "$OUTPUT" "--tag" "Build --help mentions --tag"
 assert_stderr_contains "$OUTPUT" "--force" "Build --help mentions --force"
@@ -110,7 +113,8 @@ echo ""
 echo "--- Test 4: Run help flag ---"
 
 OUTPUT=$("$OC_SANDBOX" run --help 2>&1) || true
-assert_exit_code 0 $? "oc-sandbox run --help exits with 0"
+exit_code=$?
+assert_exit_code 0 $exit_code "oc-sandbox run --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Run --help contains usage"
 assert_stderr_contains "$OUTPUT" "--tag" "Run --help mentions --tag"
 assert_stderr_contains "$OUTPUT" "--profile" "Run --help mentions --profile"
@@ -308,7 +312,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     # Test writing to / (should fail)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -326,7 +330,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
 
     # Test writing to /workspace (should succeed)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -344,7 +348,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
 
     # Test writing to /tmp (should succeed)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -362,7 +366,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
 
     # Test writing to /home/sandbox (should succeed)
     OUTPUT=$(podman run --rm --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -396,7 +400,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Test that container runs as sandbox user
     OUTPUT=$(podman run --rm \
       --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -415,7 +419,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Test that sudo is not available
     OUTPUT=$(podman run --rm \
       --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "opencode-sandbox-home-main:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -451,7 +455,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Write a marker file into the home volume
     OUTPUT=$(podman run --rm \
       --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "${VOLUME_NAME}:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
@@ -470,7 +474,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Run a second container and verify the marker persists
     OUTPUT=$(podman run --rm \
       --read-only \
-      --tmpfs /tmp:rw,nosuid,size=100m \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
       --volume "${VOLUME_NAME}:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
