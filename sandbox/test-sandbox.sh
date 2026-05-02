@@ -1152,6 +1152,91 @@ fi
 
 echo ""
 
+# --- Test 39: Uninstall help ---
+
+echo "--- Test 39: Uninstall help ---"
+
+OUTPUT=$("$OC_SANDBOX" uninstall --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "oc-sandbox uninstall --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Uninstall help contains usage"
+assert_stderr_contains "$OUTPUT" "uninstall" "Uninstall help mentions uninstall"
+
+echo ""
+
+# --- Test 40: Uninstall command ---
+
+echo "--- Test 40: Uninstall command ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s "$OC_SANDBOX" "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Uninstall command exits with 0"
+assert_stderr_contains "$OUTPUT" "Uninstalled" "Uninstall reports success"
+
+if [ ! -e "${TEMP_HOME}/.local/bin/oc-sandbox" ]; then
+  pass "Uninstall removes symlink"
+else
+  fail "Uninstall did not remove symlink"
+fi
+
+echo ""
+
+# --- Test 41: Uninstall when not installed ---
+
+echo "--- Test 41: Uninstall when not installed ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_notinstalled"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Uninstall when not installed exits with 0"
+assert_stderr_contains "$OUTPUT" "Not installed" "Uninstall reports not installed"
+
+echo ""
+
+# --- Test 42: Uninstall refuses regular file ---
+
+echo "--- Test 42: Uninstall refuses regular file ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall_regular"
+mkdir -p "${TEMP_HOME}/.local/bin"
+echo "not a symlink" > "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "Uninstall refuses regular file (non-zero exit)"
+else
+  fail "Uninstall should refuse regular file"
+fi
+assert_stderr_contains "$OUTPUT" "Not a symlink" "Uninstall warns about regular file"
+
+echo ""
+
+# --- Test 43: Uninstall refuses symlink to different target ---
+
+echo "--- Test 43: Uninstall refuses different symlink ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall_diff"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s /some/other/path "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "Uninstall refuses symlink to different target (non-zero exit)"
+else
+  fail "Uninstall should refuse symlink to different target"
+fi
+assert_stderr_contains "$OUTPUT" "points to a different location" "Uninstall warns about different symlink"
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="

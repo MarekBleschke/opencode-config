@@ -35,6 +35,7 @@ Commands:
     build       Build a container image
     run         Run opencode in a sandbox
     install     Install oc-sandbox as a global command
+    uninstall   Uninstall the global oc-sandbox command
 
 Run 'oc-sandbox <command> --help' for more information on a command.
 
@@ -99,6 +100,21 @@ Examples:
 EOF
 }
 
+usage_uninstall() {
+  cat <<EOF
+Usage: oc-sandbox uninstall
+
+Uninstall the global oc-sandbox command by removing the symlink
+from ~/.local/bin/.
+
+Options:
+    -h, --help    Show this help message
+
+Examples:
+    oc-sandbox uninstall    # Remove ~/.local/bin/oc-sandbox symlink
+EOF
+}
+
 cmd_install() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -150,6 +166,46 @@ cmd_install() {
     warn "${install_dir} is not in PATH. Add it with:"
     warn "  export PATH=\"${install_dir}:\$PATH\""
   fi
+}
+
+cmd_uninstall() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -h | --help)
+      usage_uninstall
+      exit 0
+      ;;
+    -*)
+      error "Unknown option: $1\nUse 'oc-sandbox uninstall --help' for usage information."
+      ;;
+    *)
+      error "Unknown argument: $1\nUse 'oc-sandbox uninstall --help' for usage information."
+      ;;
+    esac
+  done
+
+  local install_path="${HOME}/.local/bin/oc-sandbox"
+  local script_path="${SCRIPT_DIR}/oc-sandbox"
+
+  if [ ! -e "$install_path" ] && [ ! -L "$install_path" ]; then
+    info "Not installed at ${install_path}"
+    exit 0
+  fi
+
+  if [ ! -L "$install_path" ]; then
+    warn "Not a symlink, refusing to remove ${install_path}"
+    exit 1
+  fi
+
+  local current_target
+  current_target="$(readlink "$install_path")"
+  if [ "$current_target" != "$script_path" ]; then
+    warn "Symlink points to a different location, refusing to remove ${install_path}"
+    exit 1
+  fi
+
+  rm "$install_path"
+  info "Uninstalled ${install_path}"
 }
 
 error() {
@@ -464,6 +520,10 @@ run)
 install)
   shift
   cmd_install "$@"
+  ;;
+uninstall)
+  shift
+  cmd_uninstall "$@"
   ;;
 --help | -h)
   usage_main
