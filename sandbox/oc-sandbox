@@ -58,6 +58,8 @@ Run opencode in a containerized sandbox with filesystem isolation.
 Options:
     -t, --tag <TAG>         Tag of the image to run (default: main)
     -p, --profile <NAME>    Opencode profile to activate (default: dev)
+    --no-ssh                Skip mounting SSH keys from host
+    --no-auth               Skip mounting auth.json from host
     -h, --help              Show this help message
 
 Arguments:
@@ -186,6 +188,8 @@ cmd_run() {
   local tag="$DEFAULT_TAG"
   local profile="$DEFAULT_PROFILE"
   local workspace_path=""
+  local no_ssh="false"
+  local no_auth="false"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -206,6 +210,14 @@ cmd_run() {
     -h | --help)
       usage_run
       exit 0
+      ;;
+    --no-ssh)
+      no_ssh="true"
+      shift
+      ;;
+    --no-auth)
+      no_auth="true"
+      shift
       ;;
     -*)
       error "Unknown option: $1\nUse 'oc-sandbox run --help' for usage information."
@@ -287,6 +299,51 @@ cmd_run() {
     fi
   fi
 
+  # SSH key auto-detection
+  local ssh_mounts=()
+  local ssh_key="${HOME}/.ssh/id_rsa"
+  local ssh_pub_key="${HOME}/.ssh/id_rsa.pub"
+
+  if [ "$no_ssh" = "true" ]; then
+    info "Skipping SSH key mount (--no-ssh)"
+  elif [ -e "$ssh_key" ]; then
+    if [ ! -r "$ssh_key" ]; then
+      error "Cannot read SSH key at ~/.ssh/id_rsa. Check file permissions."
+    fi
+    # Permission check
+    local mode
+    mode=$(stat -c '%a' "$ssh_key" 2>/dev/null)
+    if [ -z "$mode" ]; then
+      local raw_mode
+      raw_mode=$(stat -f '%p' "$ssh_key" 2>/dev/null)
+      mode="${raw_mode: -3}"
+    fi
+    if [ -n "$mode" ] && [ $((0$mode & 077)) -ne 0 ]; then
+      warn "SSH key at ~/.ssh/id_rsa has overly permissive permissions (0${mode}). SSH may refuse to use it. Consider: chmod 600 ~/.ssh/id_rsa"
+    fi
+    ssh_mounts+=("--mount" "type=bind,src=${ssh_key},dst=/home/sandbox/.ssh/id_rsa,ro,readonly,relabel=private")
+    if [ -e "$ssh_pub_key" ]; then
+      ssh_mounts+=("--mount" "type=bind,src=${ssh_pub_key},dst=/home/sandbox/.ssh/id_rsa.pub,ro,readonly,relabel=private")
+    fi
+  else
+    warn "SSH key not found at ~/.ssh/id_rsa. Git SSH operations may not work."
+  fi
+
+  # auth.json auto-detection
+  local auth_mount=()
+  local auth_json="${HOME}/.local/share/opencode/auth.json"
+
+  if [ "$no_auth" = "true" ]; then
+    info "Skipping auth.json mount (--no-auth)"
+  elif [ -e "$auth_json" ]; then
+    if [ ! -r "$auth_json" ]; then
+      error "Cannot read auth.json at ~/.local/share/opencode/auth.json. Check file permissions."
+    fi
+    auth_mount+=("--mount" "type=bind,src=${auth_json},dst=/home/sandbox/.local/share/opencode/auth.json,ro,readonly,relabel=private")
+  else
+    warn "auth.json not found at ~/.local/share/opencode/auth.json. Authenticated providers may not work."
+  fi
+
   local volume_name="opencode-sandbox-home-${tag}"
 
   info "Starting opencode sandbox"
@@ -307,6 +364,8 @@ cmd_run() {
     --cap-add CHOWN \
     --security-opt no-new-privileges:true \
     --mount type=bind,src="${workspace_path}",dst=/workspace,relabel=private \
+    "${ssh_mounts[@]}" \
+    "${auth_mount[@]}" \
     --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${profile}" \
     "$image_name" \
     opencode
