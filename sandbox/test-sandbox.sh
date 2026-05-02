@@ -157,9 +157,55 @@ fi
 
 echo ""
 
-# --- Test 7: Run with invalid profile (path traversal) ---
+# --- Test 7: Build command (requires podman) ---
 
-echo "--- Test 7: Run with invalid profile (path traversal) ---"
+echo "--- Test 7: Build command ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  # Force rebuild to ensure it works
+  OUTPUT=$("$OC_SANDBOX" build --force 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --force exits with 0"
+  assert_stderr_contains "$OUTPUT" "built successfully" "Build output mentions success"
+else
+  skip "Build command (podman not available)"
+fi
+
+echo ""
+
+# --- Test 8: Build skip if exists (requires podman) ---
+
+echo "--- Test 8: Build skip if exists ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  # After the force build above, a plain build should skip
+  OUTPUT=$("$OC_SANDBOX" build 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build without --force exits with 0 when image exists"
+  assert_stderr_contains "$OUTPUT" "already exists" "Build skip mentions image already exists"
+else
+  skip "Build skip if exists (podman not available)"
+fi
+
+echo ""
+
+# --- Test 9: Build with custom tag (requires podman) ---
+
+echo "--- Test 9: Build with custom tag ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  OUTPUT=$("$OC_SANDBOX" build --tag test-integration --force 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --tag test-integration exits with 0"
+  assert_stderr_contains "$OUTPUT" "localhost/opencode-sandbox:test-integration" "Build output mentions custom tag"
+else
+  skip "Build with custom tag (podman not available)"
+fi
+
+echo ""
+# --- Test 10: Run with invalid profile (path traversal) ---
+
+echo "--- Test 10: Run with invalid profile (path traversal) ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
   IMAGE_NAME="localhost/opencode-sandbox:main"
@@ -181,9 +227,9 @@ fi
 
 echo ""
 
-# --- Test 8: Run with nonexistent path ---
+# --- Test 11: Run with nonexistent path ---
 
-echo "--- Test 8: Run with nonexistent path ---"
+echo "--- Test 11: Run with nonexistent path ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
   IMAGE_NAME="localhost/opencode-sandbox:main"
@@ -205,9 +251,9 @@ fi
 
 echo ""
 
-# --- Test 9: Run with non-directory path ---
+# --- Test 12: Run with non-directory path ---
 
-echo "--- Test 9: Run with non-directory path ---"
+echo "--- Test 12: Run with non-directory path ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
   IMAGE_NAME="localhost/opencode-sandbox:main"
@@ -231,9 +277,9 @@ fi
 
 echo ""
 
-# --- Test 10: Outside home directory warning (non-interactive) ---
+# --- Test 13: Outside home directory warning (non-interactive) ---
 
-echo "--- Test 10: Outside home directory warning (non-interactive) ---"
+echo "--- Test 13: Outside home directory warning (non-interactive) ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
   IMAGE_NAME="localhost/opencode-sandbox:main"
@@ -252,53 +298,6 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
   fi
 else
   skip "Outside home directory test (podman not available)"
-fi
-
-echo ""
-
-# --- Test 11: Build command (requires podman) ---
-
-echo "--- Test 11: Build command ---"
-
-if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  # Force rebuild to ensure it works
-  OUTPUT=$("$OC_SANDBOX" build --force 2>&1)
-  EXIT_CODE=$?
-  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --force exits with 0"
-  assert_stderr_contains "$OUTPUT" "built successfully" "Build output mentions success"
-else
-  skip "Build command (podman not available)"
-fi
-
-echo ""
-
-# --- Test 12: Build skip if exists (requires podman) ---
-
-echo "--- Test 12: Build skip if exists ---"
-
-if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  # After the force build above, a plain build should skip
-  OUTPUT=$("$OC_SANDBOX" build 2>&1)
-  EXIT_CODE=$?
-  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build without --force exits with 0 when image exists"
-  assert_stderr_contains "$OUTPUT" "already exists" "Build skip mentions image already exists"
-else
-  skip "Build skip if exists (podman not available)"
-fi
-
-echo ""
-
-# --- Test 13: Build with custom tag (requires podman) ---
-
-echo "--- Test 13: Build with custom tag ---"
-
-if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  OUTPUT=$("$OC_SANDBOX" build --tag test-integration --force 2>&1)
-  EXIT_CODE=$?
-  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --tag test-integration exits with 0"
-  assert_stderr_contains "$OUTPUT" "localhost/opencode-sandbox:test-integration" "Build output mentions custom tag"
-else
-  skip "Build with custom tag (podman not available)"
 fi
 
 echo ""
