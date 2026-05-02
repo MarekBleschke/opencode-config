@@ -109,6 +109,8 @@ assert_exit_code 0 $exit_code "oc-sandbox with no args exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Help output contains usage"
 assert_stderr_contains "$OUTPUT" "build" "Help output mentions build command"
 assert_stderr_contains "$OUTPUT" "run" "Help output mentions run command"
+assert_stderr_contains "$OUTPUT" "install" "Help output mentions install command"
+assert_stderr_contains "$OUTPUT" "uninstall" "Help output mentions uninstall command"
 
 echo ""
 
@@ -120,6 +122,8 @@ OUTPUT=$("$OC_SANDBOX" --help 2>&1)
 exit_code=$?
 assert_exit_code 0 $exit_code "oc-sandbox --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Main --help contains usage"
+assert_stderr_contains "$OUTPUT" "install" "Main --help mentions install"
+assert_stderr_contains "$OUTPUT" "uninstall" "Main --help mentions uninstall"
 
 echo ""
 
