@@ -326,6 +326,7 @@ cmd_run() {
   local workspace_path=""
   local no_ssh="false"
   local no_auth="false"
+  local debug="false"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -353,6 +354,10 @@ cmd_run() {
       ;;
     --no-auth)
       no_auth="true"
+      shift
+      ;;
+    --debug)
+      debug="true"
       shift
       ;;
     -*)
@@ -484,7 +489,15 @@ cmd_run() {
   echo "  Profile:   $profile"
   echo "  Workspace: $workspace_path"
   echo "  Image:     $image_name"
+  if [ "$debug" = "true" ]; then
+    echo "  Debug:     /bin/bash"
+  fi
   echo ""
+
+  local container_cmd="opencode"
+  if [ "$debug" = "true" ]; then
+    container_cmd="/bin/bash"
+  fi
 
   podman run \
     --rm \
@@ -502,7 +515,7 @@ cmd_run() {
     ${auth_mount[@]+"${auth_mount[@]}"} \
     --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${profile}" \
     "$image_name" \
-    opencode
+    "$container_cmd"
 }
 
 # Main dispatch
