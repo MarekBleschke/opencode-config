@@ -16,7 +16,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 usage() {
-    cat <<EOF
+  cat <<EOF
 Usage: oc-sandbox [OPTIONS] [PATH]
 
 Run opencode in a containerized sandbox with filesystem isolation.
@@ -37,77 +37,77 @@ EOF
 }
 
 error() {
-    echo -e "${RED}Error: $1${NC}" >&2
-    exit 1
+  echo -e "${RED}Error: $1${NC}" >&2
+  exit 1
 }
 
 warn() {
-    echo -e "${YELLOW}Warning: $1${NC}" >&2
+  echo -e "${YELLOW}Warning: $1${NC}" >&2
 }
 
 info() {
-    echo -e "${GREEN}$1${NC}"
+  echo -e "${GREEN}$1${NC}"
 }
 
 # Check if podman is installed
 check_podman() {
-    if ! command -v podman &>/dev/null; then
-        error "podman not found. Please install podman."
-    fi
+  if ! command -v podman &>/dev/null; then
+    error "podman not found. Please install podman."
+  fi
 }
 
 # Build the container image
 build_image() {
-    local force="${1:-false}"
+  local force="${1:-false}"
 
-    if [ "$force" = "true" ] || ! podman image exists "$IMAGE_NAME" 2>/dev/null; then
-        # Read SHA256 checksum from file
-        if [ ! -f "$OPENCODE_INSTALL_SHA256_FILE" ]; then
-            error "Checksum file not found: $OPENCODE_INSTALL_SHA256_FILE"
-        fi
-        local sha256
-        sha256=$(head -n 1 "$OPENCODE_INSTALL_SHA256_FILE" | tr -d '[:space:]')
-        if [ -z "$sha256" ]; then
-            error "Checksum file is empty: $OPENCODE_INSTALL_SHA256_FILE"
-        fi
-
-        info "Building container image..."
-        if ! podman build \
-            --build-arg "OPENCODE_INSTALL_SHA256=${sha256}" \
-            -t "$IMAGE_NAME" \
-            -f "$CONTAINERFILE" \
-            "$SCRIPT_DIR"; then
-            error "Container build failed. See output above for details."
-        fi
-        info "Image built successfully."
-    else
-        info "Using existing image: $IMAGE_NAME"
+  if [ "$force" = "true" ] || ! podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    # Read SHA256 checksum from file
+    if [ ! -f "$OPENCODE_INSTALL_SHA256_FILE" ]; then
+      error "Checksum file not found: $OPENCODE_INSTALL_SHA256_FILE"
     fi
+    local sha256
+    sha256=$(head -n 1 "$OPENCODE_INSTALL_SHA256_FILE" | tr -d '[:space:]')
+    if [ -z "$sha256" ]; then
+      error "Checksum file is empty: $OPENCODE_INSTALL_SHA256_FILE"
+    fi
+
+    info "Building container image..."
+    if ! podman build \
+      --build-arg "OPENCODE_INSTALL_SHA256=${sha256}" \
+      -t "$IMAGE_NAME" \
+      -f "$CONTAINERFILE" \
+      "$SCRIPT_DIR/.."; then
+      error "Container build failed. See output above for details."
+    fi
+    info "Image built successfully."
+  else
+    info "Using existing image: $IMAGE_NAME"
+  fi
 }
 
 # List available profiles from the container image
 list_profiles() {
-    local profiles
-    profiles=$(podman run --rm "$IMAGE_NAME" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
-    if [ -z "$profiles" ]; then
-        echo "  (no profiles found)"
-    else
-        echo "$profiles" | while read -r profile; do
-            echo "  - $profile"
-        done
-    fi
+  local profiles
+  profiles=$(podman run --rm "$IMAGE_NAME" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+  if [ -z "$profiles" ]; then
+    echo "  (no profiles found)"
+  else
+    echo "$profiles" | while read -r profile; do
+      echo "  - $profile"
+    done
+  fi
 }
 
 # Validate that a profile exists in the container image
 validate_profile() {
-    local profile="$1"
-    if ! podman run --rm "$IMAGE_NAME" test -d "/home/sandbox/opencode-config/profiles/$profile" 2>/dev/null; then
-        echo -e "${RED}Error: Invalid profile: '$profile'${NC}" >&2
-        echo "" >&2
-        echo "Available profiles:" >&2
-        list_profiles >&2
-        exit 1
-    fi
+  local profile="$1"
+  if ! podman run --rm "$IMAGE_NAME" test -d "/home/sandbox/opencode-config/profiles/$profile" 2>/dev/null; then
+    echo -e "${RED}Error: Invalid profile: '$profile'${NC}" >&2
+    echo "" >&2
+    echo "Available profiles:" >&2
+    list_profiles >&2
+    exit 1
+  fi
 }
 
 # Parse command-line arguments
@@ -116,33 +116,33 @@ WORKSPACE_PATH=""
 FORCE_BUILD="false"
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -p|--profile)
-            if [ -z "${2:-}" ]; then
-                error "Option --profile requires a value."
-            fi
-            PROFILE="$2"
-            shift 2
-            ;;
-        -b|--build)
-            FORCE_BUILD="true"
-            shift
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        -*)
-            error "Unknown option: $1\nUse --help for usage information."
-            ;;
-        *)
-            if [ -n "$WORKSPACE_PATH" ]; then
-                error "Multiple paths specified. Only one PATH argument is allowed."
-            fi
-            WORKSPACE_PATH="$1"
-            shift
-            ;;
-    esac
+  case "$1" in
+  -p | --profile)
+    if [ -z "${2:-}" ]; then
+      error "Option --profile requires a value."
+    fi
+    PROFILE="$2"
+    shift 2
+    ;;
+  -b | --build)
+    FORCE_BUILD="true"
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -*)
+    error "Unknown option: $1\nUse --help for usage information."
+    ;;
+  *)
+    if [ -n "$WORKSPACE_PATH" ]; then
+      error "Multiple paths specified. Only one PATH argument is allowed."
+    fi
+    WORKSPACE_PATH="$1"
+    shift
+    ;;
+  esac
 done
 
 # --- Validation (fast checks first, before building image) ---
@@ -152,43 +152,43 @@ check_podman
 
 # Validate Containerfile exists
 if [ ! -f "$CONTAINERFILE" ]; then
-    error "Containerfile not found at: $CONTAINERFILE"
+  error "Containerfile not found at: $CONTAINERFILE"
 fi
 
 # Default workspace path to current directory
 if [ -z "$WORKSPACE_PATH" ]; then
-    WORKSPACE_PATH="$(pwd)"
+  WORKSPACE_PATH="$(pwd)"
 fi
 
 # Resolve to absolute path and validate existence
 if [ ! -e "$WORKSPACE_PATH" ]; then
-    error "PATH does not exist: $WORKSPACE_PATH"
+  error "PATH does not exist: $WORKSPACE_PATH"
 fi
 
 # Validate path is a directory before trying to cd
 if [ ! -d "$WORKSPACE_PATH" ]; then
-    error "PATH is not a directory: $WORKSPACE_PATH"
+  error "PATH is not a directory: $WORKSPACE_PATH"
 fi
 
 WORKSPACE_PATH="$(cd "$WORKSPACE_PATH" && pwd)"
 
 # Double-check after cd resolves symlinks
 if [ ! -d "$WORKSPACE_PATH" ]; then
-    error "PATH is not a directory: $WORKSPACE_PATH"
+  error "PATH is not a directory: $WORKSPACE_PATH"
 fi
 
 # Warn if path is outside home directory
 if [[ "$WORKSPACE_PATH" != "$HOME"* ]]; then
-    warn "PATH is outside your home directory."
-    # Skip confirmation if not running in a terminal
-    if [ ! -t 0 ]; then
-        error "PATH is outside home directory and stdin is not a terminal. Run from within your home directory."
-    fi
-    read -r -p "Continue? [y/N] " response
-    if [[ "$response" != "y" && "$response" != "Y" ]]; then
-        echo "Aborted."
-        exit 0
-    fi
+  warn "PATH is outside your home directory."
+  # Skip confirmation if not running in a terminal
+  if [ ! -t 0 ]; then
+    error "PATH is outside home directory and stdin is not a terminal. Run from within your home directory."
+  fi
+  read -r -p "Continue? [y/N] " response
+  if [[ "$response" != "y" && "$response" != "Y" ]]; then
+    echo "Aborted."
+    exit 0
+  fi
 fi
 
 # --- Image build (needed for profile operations) ---
@@ -198,16 +198,16 @@ build_image "$FORCE_BUILD"
 # --- Profile validation ---
 
 if [ -z "$PROFILE" ]; then
-    echo -e "${RED}Error: No profile specified. Use --profile <name> to select a profile.${NC}" >&2
-    echo "" >&2
-    echo "Available profiles:" >&2
-    list_profiles >&2
-    exit 1
+  echo -e "${RED}Error: No profile specified. Use --profile <name> to select a profile.${NC}" >&2
+  echo "" >&2
+  echo "Available profiles:" >&2
+  list_profiles >&2
+  exit 1
 fi
 
 # Validate profile name doesn't contain path traversal characters
 if [[ "$PROFILE" =~ [/\\.] ]]; then
-    error "Profile name must not contain '/', '\\', or '.' characters."
+  error "Profile name must not contain '/', '\\', or '.' characters."
 fi
 
 validate_profile "$PROFILE"
@@ -221,16 +221,16 @@ echo "  Image:     $IMAGE_NAME"
 echo ""
 
 podman run \
-    --rm \
-    --interactive \
-    --tty \
-    --read-only \
-    --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-    --user sandbox \
-    --cap-drop ALL \
-    --cap-add CHOWN \
-    --security-opt no-new-privileges:true \
-    --mount type=bind,src="${WORKSPACE_PATH}",dst=/workspace,relabel=private \
-    --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${PROFILE}" \
-    "$IMAGE_NAME" \
-    opencode
+  --rm \
+  --interactive \
+  --tty \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+  --user sandbox \
+  --cap-drop ALL \
+  --cap-add CHOWN \
+  --security-opt no-new-privileges:true \
+  --mount type=bind,src="${WORKSPACE_PATH}",dst=/workspace,relabel=private \
+  --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${PROFILE}" \
+  "$IMAGE_NAME" \
+  opencode
