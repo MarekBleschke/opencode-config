@@ -32,8 +32,9 @@ usage_main() {
 Usage: oc-sandbox <command> [options]
 
 Commands:
-    build     Build a container image
-    run       Run opencode in a sandbox
+    build       Build a container image
+    run         Run opencode in a sandbox
+    install     Install oc-sandbox as a global command
 
 Run 'oc-sandbox <command> --help' for more information on a command.
 
@@ -81,6 +82,74 @@ Examples:
     oc-sandbox run -p systems ~/projects/x   # Use systems profile, specific project dir
     oc-sandbox run --tag experiment          # Run the "experiment" tagged image
 EOF
+}
+
+usage_install() {
+  cat <<EOF
+Usage: oc-sandbox install
+
+Install oc-sandbox as a global command by creating a symlink in
+~/.local/bin/ pointing to this script.
+
+Options:
+    -h, --help    Show this help message
+
+Examples:
+    oc-sandbox install    # Install to ~/.local/bin/oc-sandbox
+EOF
+}
+
+cmd_install() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -h | --help)
+      usage_install
+      exit 0
+      ;;
+    -*)
+      error "Unknown option: $1\nUse 'oc-sandbox install --help' for usage information."
+      ;;
+    *)
+      error "Unknown argument: $1\nUse 'oc-sandbox install --help' for usage information."
+      ;;
+    esac
+  done
+
+  local install_dir="${HOME}/.local/bin"
+  local install_path="${install_dir}/oc-sandbox"
+  local script_path="${SCRIPT_DIR}/oc-sandbox"
+
+  # Create ~/.local/bin if it doesn't exist
+  if [ ! -d "$install_dir" ]; then
+    info "Creating ${install_dir}..."
+    mkdir -p "$install_dir"
+  fi
+
+  # Check if already installed
+  if [ -L "$install_path" ]; then
+    local current_target
+    current_target="$(readlink "$install_path")"
+    if [ "$current_target" = "$script_path" ]; then
+      info "Already installed at ${install_path}"
+      exit 0
+    else
+      info "Updating symlink to point to ${script_path}..."
+      ln -sf "$script_path" "$install_path"
+      info "Updated ${install_path}"
+    fi
+  elif [ -e "$install_path" ]; then
+    warn "Refusing to overwrite a regular file at ${install_path}"
+    exit 1
+  else
+    ln -s "$script_path" "$install_path"
+    info "Installed ${install_path}"
+  fi
+
+  # Warn if ~/.local/bin is not in PATH
+  if [[ ":$PATH:" != *":${install_dir}:"* ]]; then
+    warn "${install_dir} is not in PATH. Add it with:"
+    warn "  export PATH=\"${install_dir}:\$PATH\""
+  fi
 }
 
 error() {
@@ -391,6 +460,10 @@ build)
 run)
   shift
   cmd_run "$@"
+  ;;
+install)
+  shift
+  cmd_install "$@"
   ;;
 --help | -h)
   usage_main

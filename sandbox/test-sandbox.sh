@@ -1030,6 +1030,128 @@ fi
 
 echo ""
 
+# --- Test 33: Install help ---
+
+echo "--- Test 33: Install help ---"
+
+OUTPUT=$("$OC_SANDBOX" install --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "oc-sandbox install --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Install help contains usage"
+assert_stderr_contains "$OUTPUT" "install" "Install help mentions install"
+
+echo ""
+
+# --- Test 34: Install command (dry-run via temp HOME) ---
+
+echo "--- Test 34: Install command ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_install"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+# Run install with a fake HOME so we don't pollute the real one
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install command exits with 0"
+
+# Verify symlink was created
+if [ -L "${TEMP_HOME}/.local/bin/oc-sandbox" ]; then
+  pass "Install creates symlink at ~/.local/bin/oc-sandbox"
+else
+  fail "Install did not create symlink at ~/.local/bin/oc-sandbox"
+fi
+
+# Verify symlink points to the real script
+SYMLINK_TARGET=$(readlink "${TEMP_HOME}/.local/bin/oc-sandbox")
+if [ "$SYMLINK_TARGET" = "$OC_SANDBOX" ]; then
+  pass "Install symlink points to correct target"
+else
+  fail "Install symlink points to wrong target: $SYMLINK_TARGET (expected $OC_SANDBOX)"
+fi
+
+assert_stderr_contains "$OUTPUT" "Installed" "Install output mentions success"
+
+echo ""
+
+# --- Test 35: Install idempotency ---
+
+echo "--- Test 35: Install idempotency ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_idempotency"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+# First install
+HOME="$TEMP_HOME" "$OC_SANDBOX" install >/dev/null 2>&1
+
+# Second install should report already installed
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Re-install exits with 0"
+assert_stderr_contains "$OUTPUT" "Already installed" "Re-install reports already installed"
+
+echo ""
+
+# --- Test 36: Install refuses to overwrite regular file ---
+
+echo "--- Test 36: Install refuses regular file ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_regular"
+mkdir -p "${TEMP_HOME}/.local/bin"
+echo "not a symlink" > "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "Install refuses to overwrite regular file (non-zero exit)"
+else
+  fail "Install should refuse to overwrite regular file"
+fi
+assert_stderr_contains "$OUTPUT" "Refusing to overwrite" "Install warns about regular file"
+
+echo ""
+
+# --- Test 37: Install updates different symlink ---
+
+echo "--- Test 37: Install updates different symlink ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_update"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s /some/other/path "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install updates different symlink exits with 0"
+assert_stderr_contains "$OUTPUT" "Updated" "Install reports updated symlink"
+
+# Verify it now points to us
+SYMLINK_TARGET=$(readlink "${TEMP_HOME}/.local/bin/oc-sandbox")
+if [ "$SYMLINK_TARGET" = "$OC_SANDBOX" ]; then
+  pass "Updated symlink points to correct target"
+else
+  fail "Updated symlink points to wrong target: $SYMLINK_TARGET"
+fi
+
+echo ""
+
+# --- Test 38: Install offers to create ~/.local/bin ---
+
+echo "--- Test 38: Install creates ~/.local/bin ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_nobin"
+mkdir -p "$TEMP_HOME"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install with missing ~/.local/bin exits with 0"
+
+if [ -d "${TEMP_HOME}/.local/bin" ] && [ -L "${TEMP_HOME}/.local/bin/oc-sandbox" ]; then
+  pass "Install creates ~/.local/bin and symlink when missing"
+else
+  fail "Install did not create ~/.local/bin or symlink"
+fi
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="
