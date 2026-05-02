@@ -1241,6 +1241,197 @@ assert_stderr_contains "$OUTPUT" "points to a different location" "Uninstall war
 
 echo ""
 
+# --- Test 44: GitHub CLI available ---
+
+echo "--- Test 44: GitHub CLI available ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    OUTPUT=$(podman run --rm \
+      --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+      --volume "opencode-sandbox-home-main:/home/sandbox" \
+      --user sandbox \
+      --cap-drop ALL \
+      --cap-add CHOWN \
+      --security-opt no-new-privileges:true \
+      --mount type=bind,src="${TEST_DIR}",dst=/workspace,relabel=private \
+      "$IMAGE_NAME" \
+      bash -c "command -v gh >/dev/null 2>&1 && echo 'gh_found' || echo 'gh_not_found'") || true
+
+    if printf '%s' "$OUTPUT" | grep -q "gh_found"; then
+      pass "GitHub CLI is available in container"
+    else
+      fail "GitHub CLI not found in container: $OUTPUT"
+    fi
+  else
+    skip "GitHub CLI available test (image not built)"
+  fi
+else
+  skip "GitHub CLI available test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 45: --debug in help ---
+
+echo "--- Test 45: --debug in help ---"
+
+OUTPUT=$("$OC_SANDBOX" run --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "run --help exits with 0"
+assert_stderr_contains "$OUTPUT" "--debug" "run --help mentions --debug"
+
+echo ""
+
+# --- Test 46: --debug runs bash ---
+
+echo "--- Test 46: --debug runs bash ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_46"
+    mkdir -p "${TEMP_HOME}/workspace"
+
+    OUTPUT=$(HOME="$TEMP_HOME" echo 'echo running_bash; exit' | run_with_timeout 5 "$OC_SANDBOX" run --debug "$TEMP_HOME/workspace" 2>&1) || true
+
+    if printf '%s' "$OUTPUT" | grep -q "running_bash"; then
+      pass "--debug runs /bin/bash in container"
+    else
+      fail "--debug did not run /bin/bash: $OUTPUT"
+    fi
+  else
+    skip "--debug runs bash test (image not built)"
+  fi
+else
+  skip "--debug runs bash test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 47: --no-gh-token flag ---
+
+echo "--- Test 47: --no-gh-token flag ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_47"
+    mkdir -p "${TEMP_HOME}/workspace"
+
+    OUTPUT=$(HOME="$TEMP_HOME" run_with_timeout 3 "$OC_SANDBOX" run --no-gh-token "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "Skipping GH_TOKEN detection" "--no-gh-token prints skip message"
+  else
+    skip "--no-gh-token flag test (image not built)"
+  fi
+else
+  skip "--no-gh-token flag test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 48: --gh-token flag ---
+
+echo "--- Test 48: --gh-token flag ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_48"
+    mkdir -p "${TEMP_HOME}/workspace"
+
+    OUTPUT=$(HOME="$TEMP_HOME" echo 'echo GH_TOKEN=$GH_TOKEN; exit' | run_with_timeout 5 "$OC_SANDBOX" run --gh-token my-test-token "$TEMP_HOME/workspace" 2>&1) || true
+
+    if printf '%s' "$OUTPUT" | grep -q "GH_TOKEN=my-test-token"; then
+      pass "--gh-token passes GH_TOKEN into container"
+    else
+      fail "--gh-token did not pass GH_TOKEN: $OUTPUT"
+    fi
+  else
+    skip "--gh-token flag test (image not built)"
+  fi
+else
+  skip "--gh-token flag test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 49: GH_TOKEN auto-detect warning ---
+
+echo "--- Test 49: GH_TOKEN auto-detect warning ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_49"
+    mkdir -p "${TEMP_HOME}/workspace"
+
+    # Use a PATH that does not include gh
+    OUTPUT=$(HOME="$TEMP_HOME" PATH="/usr/bin:/bin" run_with_timeout 3 "$OC_SANDBOX" run "$TEMP_HOME/workspace" 2>&1) || true
+
+    assert_stderr_contains "$OUTPUT" "gh CLI not found on host" "Missing gh CLI produces warning"
+  else
+    skip "GH_TOKEN auto-detect warning test (image not built)"
+  fi
+else
+  skip "GH_TOKEN auto-detect warning test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 50: --debug + --no-gh-token ---
+
+echo "--- Test 50: --debug + --no-gh-token ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  IMAGE_NAME="localhost/opencode-sandbox:main"
+  if podman image exists "$IMAGE_NAME" 2>/dev/null; then
+    TEMP_HOME="${TEST_DIR}/temp_home_50"
+    mkdir -p "${TEMP_HOME}/workspace"
+
+    OUTPUT=$(HOME="$TEMP_HOME" echo 'echo combined_test; exit' | run_with_timeout 5 "$OC_SANDBOX" run --debug --no-gh-token "$TEMP_HOME/workspace" 2>&1) || true
+
+    if printf '%s' "$OUTPUT" | grep -q "combined_test"; then
+      pass "--debug and --no-gh-token work together"
+    else
+      fail "--debug + --no-gh-token did not work: $OUTPUT"
+    fi
+  else
+    skip "--debug + --no-gh-token test (image not built)"
+  fi
+else
+  skip "--debug + --no-gh-token test (podman not available)"
+fi
+
+echo ""
+
+# --- Test 51: --no-gh-token + --gh-token conflict ---
+
+echo "--- Test 51: --no-gh-token + --gh-token conflict ---"
+
+OUTPUT=$("$OC_SANDBOX" run --no-gh-token --gh-token fake-token "$TEST_DIR" 2>&1) || true
+if printf '%s' "$OUTPUT" | grep -q "Cannot use --gh-token with --no-gh-token"; then
+  pass "conflicting --no-gh-token and --gh-token produces error"
+else
+  fail "conflicting flags did not produce expected error: $OUTPUT"
+fi
+
+echo ""
+
+# --- Test 52: --gh-token in help ---
+
+echo "--- Test 52: --gh-token in help ---"
+
+OUTPUT=$("$OC_SANDBOX" run --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "run --help exits with 0"
+assert_stderr_contains "$OUTPUT" "--gh-token" "run --help mentions --gh-token"
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="
