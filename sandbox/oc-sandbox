@@ -300,7 +300,7 @@ cmd_run() {
     --interactive \
     --tty \
     --read-only \
-    --tmpfs /tmp:rw,noexec,nosuid,size=100m \
+    --tmpfs /tmp:rw,nosuid,size=100m \
     --volume "${volume_name}:/home/sandbox" \
     --user sandbox \
     --cap-drop ALL \
