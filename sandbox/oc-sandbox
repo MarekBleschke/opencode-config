@@ -106,6 +106,8 @@ list_profiles() {
 
 # Build subcommand
 cmd_build() {
+  check_podman
+
   local tag="$DEFAULT_TAG"
   local force="false"
 
@@ -179,6 +181,8 @@ cmd_build() {
 
 # Run subcommand
 cmd_run() {
+  check_podman
+
   local tag="$DEFAULT_TAG"
   local profile="$DEFAULT_PROFILE"
   local workspace_path=""
@@ -231,10 +235,8 @@ cmd_run() {
       done
     else
       echo "  (no opencode-sandbox images found)" >&2
-      echo "" >&2
-      echo "Run 'oc-sandbox build' first to build an image." >&2
     fi
-    exit 1
+    error "Run 'oc-sandbox build' first to build an image."
   fi
 
   # Validate profile name doesn't contain path traversal characters
@@ -298,7 +300,7 @@ cmd_run() {
     --interactive \
     --tty \
     --read-only \
-    --tmpfs /tmp:rw,nosuid,size=100m \
+    --tmpfs /tmp:rw,noexec,nosuid,size=100m \
     --volume "${volume_name}:/home/sandbox" \
     --user sandbox \
     --cap-drop ALL \
