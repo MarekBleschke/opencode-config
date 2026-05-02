@@ -1,8 +1,5 @@
 # TODO
-- [ ] agents for dev profile
-  - [ ] creating workspace as separate step - does not work in brainstorm agent
-  - [ ] planner still asks for continuing with implementation 
-  - [ ] spec review is delegated to general agent, not spec-reviewer
-- [ ] commands for dev profile
-- [ ] sandbox
+- [x] commands for dev profile
+- [x] sandbox
+- [ ] install gh CLI for PRs (with mounting token like for opencode)
 - [ ] customizing models through config file
