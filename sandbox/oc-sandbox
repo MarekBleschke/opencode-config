@@ -68,11 +68,14 @@ Usage: oc-sandbox run [OPTIONS] [PATH]
 Run opencode in a containerized sandbox with filesystem isolation.
 
 Options:
-    -t, --tag <TAG>         Tag of the image to run (default: main)
-    -p, --profile <NAME>    Opencode profile to activate (default: dev)
-    --no-ssh                Skip mounting SSH keys from host
-    --no-auth               Skip mounting auth.json from host
-    -h, --help              Show this help message
+    -t, --tag <TAG>            Tag of the image to run (default: main)
+    -p, --profile <NAME>      Opencode profile to activate (default: dev)
+    --no-ssh                  Skip mounting SSH keys from host
+    --no-auth                 Skip mounting auth.json from host
+    --no-gh-token             Skip GH_TOKEN detection from host
+    --gh-token <TOKEN>        Use the provided GitHub token instead of auto-detecting
+    --debug                   Run /bin/bash instead of opencode for debugging
+    -h, --help                Show this help message
 
 Arguments:
     PATH   Directory to mount as /workspace (default: current working directory)
