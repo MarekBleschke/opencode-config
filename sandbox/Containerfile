@@ -10,6 +10,7 @@ RUN apt-get update && \
   golang-go \
   curl \
   ca-certificates \
+  openssh-client \
   && rm -rf /var/lib/apt/lists/*
 
 # Install opencode CLI with checksum verification
@@ -30,6 +31,16 @@ RUN curl -fsSL https://opencode.ai/install -o /tmp/install.sh && \
 RUN groupadd -g 1001 sandbox && \
   useradd -m -u 1001 -g 1001 -s /bin/bash sandbox
 
+# Pre-configure GitHub SSH host keys so git+ssh works without interactive prompt
+RUN mkdir -p /home/sandbox/.ssh && \
+    ssh-keyscan github.com >> /home/sandbox/.ssh/known_hosts && \
+    chown -R sandbox:sandbox /home/sandbox/.ssh
+
+# Create directory structure for runtime bind mounts (SSH keys, auth config)
+# Must set ownership to sandbox:sandbox so the user can write to these directories
+RUN mkdir -p /home/sandbox/.local/share/opencode && \
+    chown -R sandbox:sandbox /home/sandbox/.local
+
 # Copy the local opencode-config repository into the image
 COPY --chown=sandbox:sandbox . /home/sandbox/opencode-config/
 
@@ -39,6 +50,10 @@ RUN git config --global --add safe.directory /home/sandbox/opencode-config && \
 
 # Switch to sandbox user
 USER sandbox
+
+# Pre-warm opencode plugins to avoid ~10s hang on first interactive run.
+# Tolerate failure in case network is unavailable during build.
+RUN opencode run --agent plan "say hi" || true
 
 # Set working directory to /workspace (will be bind-mounted at runtime)
 WORKDIR /workspace
