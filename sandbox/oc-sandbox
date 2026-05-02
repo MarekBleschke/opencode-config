@@ -243,8 +243,6 @@ list_profiles() {
 
 # Build subcommand
 cmd_build() {
-  check_podman
-
   local tag="$DEFAULT_TAG"
   local force="false"
 
@@ -273,6 +271,8 @@ cmd_build() {
       ;;
     esac
   done
+
+  check_podman
 
   local image_name="${IMAGE_BASE}:${tag}"
 
@@ -318,8 +318,6 @@ cmd_build() {
 
 # Run subcommand
 cmd_run() {
-  check_podman
-
   local tag="$DEFAULT_TAG"
   local profile="$DEFAULT_PROFILE"
   local workspace_path=""
@@ -366,6 +364,8 @@ cmd_run() {
       ;;
     esac
   done
+
+  check_podman
 
   local image_name="${IMAGE_BASE}:${tag}"
 
