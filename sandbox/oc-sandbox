@@ -327,6 +327,8 @@ cmd_run() {
   local no_ssh="false"
   local no_auth="false"
   local debug="false"
+  local no_gh_token="false"
+  local gh_token=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -356,6 +358,17 @@ cmd_run() {
       no_auth="true"
       shift
       ;;
+    --no-gh-token)
+      no_gh_token="true"
+      shift
+      ;;
+    --gh-token)
+      if [ -z "${2:-}" ]; then
+        error "Option --gh-token requires a value."
+      fi
+      gh_token="$2"
+      shift 2
+      ;;
     --debug)
       debug="true"
       shift
@@ -372,6 +385,11 @@ cmd_run() {
       ;;
     esac
   done
+
+  # Validate --no-gh-token / --gh-token conflict
+  if [ "$no_gh_token" = "true" ] && [ -n "$gh_token" ]; then
+    error "Cannot use --gh-token with --no-gh-token"
+  fi
 
   check_podman
 
@@ -483,6 +501,36 @@ cmd_run() {
     warn "auth.json not found at ~/.local/share/opencode/auth.json. Authenticated providers may not work."
   fi
 
+  # GH_TOKEN auto-detection
+  local gh_token_env=()
+
+  if [ "$no_gh_token" = "true" ]; then
+    info "Skipping GH_TOKEN detection (--no-gh-token)"
+  elif [ -n "$gh_token" ]; then
+    gh_token_env+=("--env" "GH_TOKEN=${gh_token}")
+  else
+    if ! command -v gh &>/dev/null; then
+      warn "gh CLI not found on host. GitHub operations inside the container may not work."
+    else
+      local token_output=""
+      local token_stderr_file
+      token_stderr_file=$(mktemp)
+      if token_output=$(gh auth token 2>"$token_stderr_file"); then
+        token_output=$(echo "$token_output" | tr -d '[:space:]')
+        if [ -z "$token_output" ]; then
+          warn "gh auth token returned empty token. GitHub operations inside the container may not work."
+        else
+          gh_token_env+=("--env" "GH_TOKEN=${token_output}")
+        fi
+      else
+        local token_stderr
+        token_stderr=$(cat "$token_stderr_file")
+        warn "gh auth token failed: ${token_stderr}. GitHub operations inside the container may not work."
+      fi
+      rm -f "$token_stderr_file"
+    fi
+  fi
+
   local volume_name="opencode-sandbox-home-${tag}"
 
   info "Starting opencode sandbox"
@@ -513,6 +561,7 @@ cmd_run() {
     --mount type=bind,src="${workspace_path}",dst=/workspace,relabel=private \
     ${ssh_mounts[@]+"${ssh_mounts[@]}"} \
     ${auth_mount[@]+"${auth_mount[@]}"} \
+    ${gh_token_env[@]+"${gh_token_env[@]}"} \
     --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${profile}" \
     "$image_name" \
     "$container_cmd"
