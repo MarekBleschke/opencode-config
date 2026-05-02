@@ -109,6 +109,8 @@ assert_exit_code 0 $exit_code "oc-sandbox with no args exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Help output contains usage"
 assert_stderr_contains "$OUTPUT" "build" "Help output mentions build command"
 assert_stderr_contains "$OUTPUT" "run" "Help output mentions run command"
+assert_stderr_contains "$OUTPUT" "install" "Help output mentions install command"
+assert_stderr_contains "$OUTPUT" "uninstall" "Help output mentions uninstall command"
 
 echo ""
 
@@ -120,6 +122,8 @@ OUTPUT=$("$OC_SANDBOX" --help 2>&1)
 exit_code=$?
 assert_exit_code 0 $exit_code "oc-sandbox --help exits with 0"
 assert_stderr_contains "$OUTPUT" "Usage:" "Main --help contains usage"
+assert_stderr_contains "$OUTPUT" "install" "Main --help mentions install"
+assert_stderr_contains "$OUTPUT" "uninstall" "Main --help mentions uninstall"
 
 echo ""
 
@@ -981,6 +985,259 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
 else
   skip "Git SSH clone test (podman not available)"
 fi
+
+echo ""
+
+# --- Test 31: Symlink resolution ---
+
+echo "--- Test 31: Symlink resolution ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  SYMLINK_DIR="${TEST_DIR}/symlink_test"
+  mkdir -p "$SYMLINK_DIR"
+  ln -s "$OC_SANDBOX" "${SYMLINK_DIR}/oc-sandbox"
+
+  OUTPUT=$("${SYMLINK_DIR}/oc-sandbox" build --help 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "Symlinked oc-sandbox build --help exits with 0"
+  assert_stderr_contains "$OUTPUT" "Usage:" "Symlinked build --help shows usage"
+  assert_stderr_contains "$OUTPUT" "--tag" "Symlinked build --help mentions --tag"
+
+  # Verify that SCRIPT_DIR resolves correctly by checking build can find Containerfile
+  # We do this indirectly: the real script is in a directory with Containerfile,
+  # so if SCRIPT_DIR resolved to the symlink dir, build --help would still work
+  # but a real build would fail. We test the real build via symlink in Test 32.
+  pass "Symlink resolution: build --help works through symlink"
+else
+  skip "Symlink resolution (podman not available)"
+fi
+
+echo ""
+
+# --- Test 32: Build through symlink (requires podman) ---
+
+echo "--- Test 32: Build through symlink ---"
+
+if [ "$PODMAN_AVAILABLE" = "true" ]; then
+  SYMLINK_BUILD_DIR="${TEST_DIR}/symlink_build"
+  mkdir -p "$SYMLINK_BUILD_DIR"
+  ln -s "$OC_SANDBOX" "${SYMLINK_BUILD_DIR}/oc-sandbox"
+
+  # Use a unique tag so we don't interfere with other tests
+  OUTPUT=$("${SYMLINK_BUILD_DIR}/oc-sandbox" build --tag symlink-test --force 2>&1)
+  EXIT_CODE=$?
+  assert_exit_code 0 "$EXIT_CODE" "Build through symlink exits with 0"
+  assert_stderr_contains "$OUTPUT" "built successfully" "Build through symlink reports success"
+else
+  skip "Build through symlink (podman not available)"
+fi
+
+echo ""
+
+# --- Test 33: Install help ---
+
+echo "--- Test 33: Install help ---"
+
+OUTPUT=$("$OC_SANDBOX" install --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "oc-sandbox install --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Install help contains usage"
+assert_stderr_contains "$OUTPUT" "install" "Install help mentions install"
+
+echo ""
+
+# --- Test 34: Install command (dry-run via temp HOME) ---
+
+echo "--- Test 34: Install command ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_install"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+# Run install with a fake HOME so we don't pollute the real one
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install command exits with 0"
+
+# Verify symlink was created
+if [ -L "${TEMP_HOME}/.local/bin/oc-sandbox" ]; then
+  pass "Install creates symlink at ~/.local/bin/oc-sandbox"
+else
+  fail "Install did not create symlink at ~/.local/bin/oc-sandbox"
+fi
+
+# Verify symlink points to the real script
+SYMLINK_TARGET=$(readlink "${TEMP_HOME}/.local/bin/oc-sandbox")
+if [ "$SYMLINK_TARGET" = "$OC_SANDBOX" ]; then
+  pass "Install symlink points to correct target"
+else
+  fail "Install symlink points to wrong target: $SYMLINK_TARGET (expected $OC_SANDBOX)"
+fi
+
+assert_stderr_contains "$OUTPUT" "Installed" "Install output mentions success"
+
+echo ""
+
+# --- Test 35: Install idempotency ---
+
+echo "--- Test 35: Install idempotency ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_idempotency"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+# First install
+HOME="$TEMP_HOME" "$OC_SANDBOX" install >/dev/null 2>&1
+
+# Second install should report already installed
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Re-install exits with 0"
+assert_stderr_contains "$OUTPUT" "Already installed" "Re-install reports already installed"
+
+echo ""
+
+# --- Test 36: Install refuses to overwrite regular file ---
+
+echo "--- Test 36: Install refuses regular file ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_regular"
+mkdir -p "${TEMP_HOME}/.local/bin"
+echo "not a symlink" > "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "Install refuses to overwrite regular file (non-zero exit)"
+else
+  fail "Install should refuse to overwrite regular file"
+fi
+assert_stderr_contains "$OUTPUT" "Refusing to overwrite" "Install warns about regular file"
+
+echo ""
+
+# --- Test 37: Install updates different symlink ---
+
+echo "--- Test 37: Install updates different symlink ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_update"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s /some/other/path "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install updates different symlink exits with 0"
+assert_stderr_contains "$OUTPUT" "Updated" "Install reports updated symlink"
+
+# Verify it now points to us
+SYMLINK_TARGET=$(readlink "${TEMP_HOME}/.local/bin/oc-sandbox")
+if [ "$SYMLINK_TARGET" = "$OC_SANDBOX" ]; then
+  pass "Updated symlink points to correct target"
+else
+  fail "Updated symlink points to wrong target: $SYMLINK_TARGET"
+fi
+
+echo ""
+
+# --- Test 38: Install offers to create ~/.local/bin ---
+
+echo "--- Test 38: Install creates ~/.local/bin ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_nobin"
+mkdir -p "$TEMP_HOME"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install with missing ~/.local/bin exits with 0"
+
+if [ -d "${TEMP_HOME}/.local/bin" ] && [ -L "${TEMP_HOME}/.local/bin/oc-sandbox" ]; then
+  pass "Install creates ~/.local/bin and symlink when missing"
+else
+  fail "Install did not create ~/.local/bin or symlink"
+fi
+
+echo ""
+
+# --- Test 39: Uninstall help ---
+
+echo "--- Test 39: Uninstall help ---"
+
+OUTPUT=$("$OC_SANDBOX" uninstall --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "oc-sandbox uninstall --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "Uninstall help contains usage"
+assert_stderr_contains "$OUTPUT" "uninstall" "Uninstall help mentions uninstall"
+
+echo ""
+
+# --- Test 40: Uninstall command ---
+
+echo "--- Test 40: Uninstall command ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s "$OC_SANDBOX" "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Uninstall command exits with 0"
+assert_stderr_contains "$OUTPUT" "Uninstalled" "Uninstall reports success"
+
+if [ ! -e "${TEMP_HOME}/.local/bin/oc-sandbox" ]; then
+  pass "Uninstall removes symlink"
+else
+  fail "Uninstall did not remove symlink"
+fi
+
+echo ""
+
+# --- Test 41: Uninstall when not installed ---
+
+echo "--- Test 41: Uninstall when not installed ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_notinstalled"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Uninstall when not installed exits with 0"
+assert_stderr_contains "$OUTPUT" "Not installed" "Uninstall reports not installed"
+
+echo ""
+
+# --- Test 42: Uninstall refuses regular file ---
+
+echo "--- Test 42: Uninstall refuses regular file ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall_regular"
+mkdir -p "${TEMP_HOME}/.local/bin"
+echo "not a symlink" > "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "Uninstall refuses regular file (non-zero exit)"
+else
+  fail "Uninstall should refuse regular file"
+fi
+assert_stderr_contains "$OUTPUT" "Not a symlink" "Uninstall warns about regular file"
+
+echo ""
+
+# --- Test 43: Uninstall refuses symlink to different target ---
+
+echo "--- Test 43: Uninstall refuses different symlink ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall_diff"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s /some/other/path "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "Uninstall refuses symlink to different target (non-zero exit)"
+else
+  fail "Uninstall should refuse symlink to different target"
+fi
+assert_stderr_contains "$OUTPUT" "points to a different location" "Uninstall warns about different symlink"
 
 echo ""
 
