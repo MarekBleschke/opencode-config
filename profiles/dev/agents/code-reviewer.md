@@ -6,12 +6,9 @@ hidden: true
 temperature: 0.2
 color: warning
 permission:
-  edit: deny
+  edit: allow
   bash:
     "*": allow
-    "rm *": deny
-    "rmdir *": deny
-    "mv *": deny
     "git push *": deny
     "git commit *": deny
 ---
