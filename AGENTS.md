@@ -1,4 +1,6 @@
 # Agent Guidelines
+## Respecting .gitignore
+You CAN read and edit files matching patterns in `.gitignore`, but you MUST NOT commit them. Those are local files only.
 
 ## Bash Scripts: macOS + Linux Compatibility
 
