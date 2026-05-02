@@ -319,7 +319,8 @@ cmd_run() {
       mode="${raw_mode: -3}"
     fi
     if [ -n "$mode" ] && [ $((0$mode & 077)) -ne 0 ]; then
-      warn "SSH key at ~/.ssh/id_rsa has overly permissive permissions (0${mode}). SSH may refuse to use it. Consider: chmod 600 ~/.ssh/id_rsa"
+      warn "SSH key at ~/.ssh/id_rsa has overly permissive permissions (0${mode})."
+      warn "SSH may refuse to use it. Consider: chmod 600 ~/.ssh/id_rsa"
     fi
     ssh_mounts+=("--mount" "type=bind,src=${ssh_key},dst=/home/sandbox/.ssh/id_rsa,ro,readonly,relabel=private")
     if [ -e "$ssh_pub_key" ]; then
@@ -364,8 +365,8 @@ cmd_run() {
     --cap-add CHOWN \
     --security-opt no-new-privileges:true \
     --mount type=bind,src="${workspace_path}",dst=/workspace,relabel=private \
-    "${ssh_mounts[@]}" \
-    "${auth_mount[@]}" \
+    ${ssh_mounts[@]+"${ssh_mounts[@]}"} \
+    ${auth_mount[@]+"${auth_mount[@]}"} \
     --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${profile}" \
     "$image_name" \
     opencode
