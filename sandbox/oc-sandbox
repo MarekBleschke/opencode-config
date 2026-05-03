@@ -299,13 +299,22 @@ cmd_completion_refresh() {
   local images
   images=$(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${IMAGE_BASE}:" | sed "s|^${IMAGE_BASE}:||" || true)
   echo "$images" > "$cache_dir/images"
+  # Update images_timestamp while preserving profile timestamps
+  local existing_profiles_ts=""
+  if [[ -f "$cache_dir/cache.meta" ]]; then
+    existing_profiles_ts=$(grep "^profiles-.*_timestamp=" "$cache_dir/cache.meta" 2>/dev/null || true)
+  fi
   echo "images_timestamp=${now}" > "$cache_dir/cache.meta"
+  if [[ -n "$existing_profiles_ts" ]]; then
+    echo "$existing_profiles_ts" >> "$cache_dir/cache.meta"
+  fi
 
   # Refresh profiles for specific tag or all tags
   if [ -n "$specific_tag" ]; then
     _refresh_profiles_for_tag "$specific_tag" "$cache_dir" "$now"
   else
     # Refresh profiles for all known tags
+    local tag_name
     while IFS= read -r tag_name; do
       [ -z "$tag_name" ] && continue
       _refresh_profiles_for_tag "$tag_name" "$cache_dir" "$now"
