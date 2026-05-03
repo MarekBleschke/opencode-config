@@ -436,7 +436,8 @@ _oc-sandbox() {
   if (( CURRENT == 2 )); then
     _describe 'command' commands
     _arguments \
-      '--help' '-h[Show help message]'
+      '--help[Show help message]' \
+      '-h[Show help message]'
     return
   fi
 
@@ -454,7 +455,7 @@ _oc-sandbox_build() {
     '(-t --tag)'{-t,--tag}'[Tag for the built image]:tag:_oc-sandbox_image_tags' \
     '(-f --force)'{-f,--force}'[Force rebuild even if image exists]' \
     '--help[Show help message]' \
-    '(-h)'-h'[Show help message]'
+    '-h[Show help message]'
 }
 
 _oc-sandbox_run() {
@@ -467,7 +468,7 @@ _oc-sandbox_run() {
     '--gh-token[GitHub token]:token:' \
     '--debug[Run /bin/bash instead of opencode]' \
     '--help[Show help message]' \
-    '(-h)'-h'[Show help message]' \
+    '-h[Show help message]' \
     ':path:_files -/'
 }
 
@@ -475,13 +476,13 @@ _oc-sandbox_install() {
   _arguments \
     '--no-completions[Skip shell completion setup]' \
     '--help[Show help message]' \
-    '(-h)'-h'[Show help message]'
+    '-h[Show help message]'
 }
 
 _oc-sandbox_uninstall() {
   _arguments \
     '--help[Show help message]' \
-    '(-h)'-h'[Show help message]'
+    '-h[Show help message]'
 }
 
 _oc-sandbox_completion() {
@@ -490,7 +491,7 @@ _oc-sandbox_completion() {
     '--refresh[Force-refresh the completion cache]' \
     '--tag[Refresh cache for a specific tag only]:tag:_oc-sandbox_image_tags' \
     '--help[Show help message]' \
-    '(-h)'-h'[Show help message]'
+    '-h[Show help message]'
 }
 
 _oc-sandbox_image_tags() {
@@ -539,7 +540,7 @@ _oc-sandbox_maybe_refresh_cache() {
   fi
 }
 
-_oc-sandbox "$@"
+compdef _oc-sandbox oc-sandbox
 ZSH_EOF
 }
 

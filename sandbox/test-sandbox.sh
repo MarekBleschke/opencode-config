@@ -1469,6 +1469,7 @@ assert_stdout_contains "$OUTPUT" "_oc-sandbox_build" "Zsh output contains build 
 assert_stdout_contains "$OUTPUT" "_oc-sandbox_run" "Zsh output contains run completion"
 assert_stdout_contains "$OUTPUT" "_oc-sandbox_image_tags" "Zsh output contains image tag completion"
 assert_stdout_contains "$OUTPUT" "_oc-sandbox_profiles" "Zsh output contains profile completion"
+assert_stdout_contains "$OUTPUT" "compdef _oc-sandbox oc-sandbox" "Zsh output contains compdef registration"
 
 echo ""
 
