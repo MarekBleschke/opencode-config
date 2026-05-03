@@ -1539,6 +1539,39 @@ assert_stderr_contains "$OUTPUT" "Unknown option" "Error mentions unknown option
 
 echo ""
 
+# --- Test 60: Completion --refresh (basic functionality) ---
+
+echo "--- Test 60: Completion --refresh ---"
+
+OUTPUT=$("$OC_SANDBOX" completion --refresh 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "completion --refresh exits with 0"
+assert_stderr_contains "$OUTPUT" "podman not found" "completion --refresh warns about missing podman"
+
+# Verify cache directory was created
+if [ -d "$TEST_DIR/.cache/oc-sandbox" ]; then
+  pass "Cache directory created by --refresh"
+else
+  fail "Cache directory should be created by --refresh"
+fi
+
+echo ""
+
+# --- Test 61: Completion --tag without value (error path) ---
+
+echo "--- Test 61: Completion --tag without value ---"
+
+OUTPUT=$("$OC_SANDBOX" completion --refresh --tag 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "completion --tag without value exits with error"
+else
+  fail "completion --tag without value should exit with error"
+fi
+assert_stderr_contains "$OUTPUT" "requires a value" "Error mentions --tag requires a value"
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="
