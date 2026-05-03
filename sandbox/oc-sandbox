@@ -445,6 +445,67 @@ _oc-sandbox "$@"
 ZSH_EOF
 }
 
+cmd_completion() {
+  local refresh="false"
+  local tag=""
+  local shell_arg=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --refresh)
+      refresh="true"
+      shift
+      ;;
+    --tag)
+      if [ -z "${2:-}" ]; then
+        error "Option --tag requires a value."
+      fi
+      tag="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage_completion
+      exit 0
+      ;;
+    -*)
+      error "Unknown option: $1\nUse 'oc-sandbox completion --help' for usage information."
+      ;;
+    *)
+      # Shell argument
+      if [ -n "$shell_arg" ]; then
+        error "Unknown argument: $1\nUse 'oc-sandbox completion --help' for usage information."
+      fi
+      shell_arg="$1"
+      shift
+      ;;
+    esac
+  done
+
+  if [ "$refresh" = "true" ]; then
+    cmd_completion_refresh "$tag"
+    return
+  fi
+
+  if [ -z "${shell_arg:-}" ]; then
+    error "Shell name required. Use 'oc-sandbox completion --help' for available shells."
+  fi
+
+  case "$shell_arg" in
+    zsh)
+      cmd_completion_zsh
+      ;;
+    bash)
+      echo "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+      ;;
+    fish)
+      echo "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+      ;;
+    *)
+      error "Unknown shell '${shell_arg}'. Available shells: zsh"
+      ;;
+  esac
+}
+
 # Build subcommand
 cmd_build() {
   local tag="$DEFAULT_TAG"
