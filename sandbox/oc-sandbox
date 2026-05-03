@@ -265,6 +265,54 @@ list_profiles() {
   fi
 }
 
+_refresh_profiles_for_tag() {
+  local tag_name="$1"
+  local cache_dir="$2"
+  local now="$3"
+  local image_name="${IMAGE_BASE}:${tag_name}"
+
+  if podman image exists "$image_name" 2>/dev/null; then
+    local profiles
+    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+    echo "$profiles" > "$cache_dir/profiles-${tag_name}"
+    echo "profiles-${tag_name}_timestamp=${now}" >> "$cache_dir/cache.meta"
+  fi
+}
+
+cmd_completion_refresh() {
+  local specific_tag="${1:-}"
+
+  # Create cache directory if needed
+  local cache_dir="${HOME}/.cache/oc-sandbox"
+  mkdir -p "$cache_dir"
+
+  # Check if podman is available
+  if ! command -v podman &>/dev/null; then
+    warn "podman not found. Cache refresh skipped."
+    return 0
+  fi
+
+  local now
+  now=$(date +%s)
+
+  # Refresh images list
+  local images
+  images=$(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${IMAGE_BASE}:" | sed "s|^${IMAGE_BASE}:||" || true)
+  echo "$images" > "$cache_dir/images"
+  echo "images_timestamp=${now}" > "$cache_dir/cache.meta"
+
+  # Refresh profiles for specific tag or all tags
+  if [ -n "$specific_tag" ]; then
+    _refresh_profiles_for_tag "$specific_tag" "$cache_dir" "$now"
+  else
+    # Refresh profiles for all known tags
+    while IFS= read -r tag_name; do
+      [ -z "$tag_name" ] && continue
+      _refresh_profiles_for_tag "$tag_name" "$cache_dir" "$now"
+    done < "$cache_dir/images"
+  fi
+}
+
 # Build subcommand
 cmd_build() {
   local tag="$DEFAULT_TAG"
