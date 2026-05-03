@@ -118,6 +118,27 @@ Examples:
 EOF
 }
 
+usage_completion() {
+  cat <<EOF
+Usage: oc-sandbox completion <shell>
+
+Generate shell completion scripts for oc-sandbox.
+
+Shells:
+    zsh         Generate Zsh completion script
+
+Options:
+    --refresh           Force-refresh the completion cache
+    --tag <TAG>         Refresh cache for a specific tag only (used with --refresh)
+    -h, --help          Show this help message
+
+Examples:
+    source <(oc-sandbox completion zsh)    # Enable Zsh completions
+    oc-sandbox completion --refresh        # Manually refresh all cached data
+    oc-sandbox completion --refresh --tag main  # Refresh cache for tag "main" only
+EOF
+}
+
 cmd_install() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
