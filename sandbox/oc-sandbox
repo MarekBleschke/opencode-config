@@ -245,6 +245,79 @@ info() {
   echo -e "${GREEN}$1${NC}"
 }
 
+setup_completions() {
+  local shell="$(basename "${SHELL:-}")"
+  case "$shell" in
+    zsh)
+      local rc_file="${HOME}/.zshrc"
+      local completion_line='source <(oc-sandbox completion zsh)'
+
+      # Handle symlinked .zshrc
+      if [ -L "$rc_file" ]; then
+        info ".zshrc is a symlink; completions will be added to the target file"
+      fi
+
+      # Create .zshrc if it doesn't exist
+      if [ ! -f "$rc_file" ]; then
+        touch "$rc_file"
+      fi
+
+      # Check if completion line already exists (idempotent)
+      if grep -qF "$completion_line" "$rc_file" 2>/dev/null; then
+        info "Shell completions already set up in ${rc_file}"
+      else
+        echo '' >> "$rc_file"
+        echo "$completion_line" >> "$rc_file"
+        info "Added shell completions to ${rc_file}"
+      fi
+      ;;
+    bash)
+      warn "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+      ;;
+    fish)
+      warn "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+      ;;
+    *)
+      warn "Unknown shell '${shell}'. Add to your shell config: source <(oc-sandbox completion zsh)"
+      ;;
+  esac
+
+  # Seed the completion cache
+  oc-sandbox completion --refresh >/dev/null 2>&1 || true
+}
+
+cleanup_completions() {
+  local shell="$(basename "${SHELL:-}")"
+  case "$shell" in
+    zsh)
+      local rc_file="${HOME}/.zshrc"
+      local completion_line='source <(oc-sandbox completion zsh)'
+
+      if [ -f "$rc_file" ]; then
+        if [ -L "$rc_file" ]; then
+          info ".zshrc is a symlink; removing completions from the target file"
+        fi
+
+        # Remove the completion line
+        local tmp_file
+        tmp_file=$(mktemp)
+        grep -vF "$completion_line" "$rc_file" > "$tmp_file" || true
+        mv "$tmp_file" "$rc_file"
+        info "Removed shell completions from ${rc_file}"
+      fi
+      ;;
+    # bash/fish: nothing to clean up (not implemented yet)
+  esac
+}
+
+cleanup_cache() {
+  local cache_dir="${HOME}/.cache/oc-sandbox"
+  if [ -d "$cache_dir" ]; then
+    rm -rf "$cache_dir"
+    info "Removed completion cache from ${cache_dir}"
+  fi
+}
+
 check_podman() {
   if ! command -v podman &>/dev/null; then
     error "podman not found. Please install podman."
