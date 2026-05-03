@@ -178,6 +178,10 @@ cmd_install() {
     current_target="$(readlink "$install_path")"
     if [ "$current_target" = "$script_path" ]; then
       info "Already installed at ${install_path}"
+      # Still set up completions unless --no-completions was specified
+      if [ "$no_completions" = "false" ]; then
+        setup_completions
+      fi
       exit 0
     else
       info "Updating symlink to point to ${script_path}..."
