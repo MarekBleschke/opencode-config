@@ -488,6 +488,7 @@ _oc-sandbox_completion() {
   _arguments \
     ':shell:_oc-sandbox_shells' \
     '--refresh[Force-refresh the completion cache]' \
+    '--tag[Refresh cache for a specific tag only]:tag:_oc-sandbox_image_tags' \
     '--help[Show help message]' \
     '(-h)'-h'[Show help message]'
 }
