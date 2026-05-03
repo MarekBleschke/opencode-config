@@ -110,13 +110,13 @@ usage_uninstall() {
 Usage: oc-sandbox uninstall
 
 Uninstall the global oc-sandbox command by removing the symlink
-from ~/.local/bin/.
+from ~/.local/bin/. Also removes shell completion setup and cache.
 
 Options:
     -h, --help    Show this help message
 
 Examples:
-    oc-sandbox uninstall    # Remove ~/.local/bin/oc-sandbox symlink
+    oc-sandbox uninstall    # Remove symlink, completions, and cache
 EOF
 }
 
@@ -246,6 +246,12 @@ cmd_uninstall() {
 
   rm "$install_path"
   info "Uninstalled ${install_path}"
+
+  # Clean up shell completions
+  cleanup_completions
+
+  # Clean up completion cache
+  cleanup_cache
 }
 
 error() {
