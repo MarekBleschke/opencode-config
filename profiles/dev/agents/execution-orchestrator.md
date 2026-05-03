@@ -19,6 +19,7 @@ Execute these steps in order. Deviate from this workflow only if the user explic
 
 1. Check for current workspace: look for existing worktree or feature branch. Don't assume - check with user for the right choice presenting options.
 2. Use `skill` tool to load `superpowers/subagent-driven-development` skill and follow it.
+3. After finishing plan execution provide additional summary of all unsolved issues found during implementation with information: which task, spec or code review, short description, criticality of issue, reason why unsolved. Sort them by criticality.
 
 ## Skill overrides
 
