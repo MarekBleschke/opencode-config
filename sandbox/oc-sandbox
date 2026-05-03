@@ -271,38 +271,38 @@ info() {
 setup_completions() {
   local shell="$(basename "${SHELL:-}")"
   case "$shell" in
-    zsh)
-      local rc_file="${HOME}/.zshrc"
-      local completion_line='source <(oc-sandbox completion zsh)'
+  zsh)
+    local rc_file="${HOME}/.zshrc"
+    local completion_line='source <(oc-sandbox completion zsh)'
 
-      # Handle symlinked .zshrc
-      if [ -L "$rc_file" ]; then
-        info ".zshrc is a symlink; completions will be added to the target file"
-      fi
+    # Handle symlinked .zshrc
+    if [ -L "$rc_file" ]; then
+      info ".zshrc is a symlink; completions will be added to the target file"
+    fi
 
-      # Create .zshrc if it doesn't exist
-      if [ ! -f "$rc_file" ]; then
-        touch "$rc_file"
-      fi
+    # Create .zshrc if it doesn't exist
+    if [ ! -f "$rc_file" ]; then
+      touch "$rc_file"
+    fi
 
-      # Check if completion line already exists (idempotent)
-      if grep -qF "$completion_line" "$rc_file" 2>/dev/null; then
-        info "Shell completions already set up in ${rc_file}"
-      else
-        echo '' >> "$rc_file"
-        echo "$completion_line" >> "$rc_file"
-        info "Added shell completions to ${rc_file}"
-      fi
-      ;;
-    bash)
-      warn "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
-      ;;
-    fish)
-      warn "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
-      ;;
-    *)
-      warn "Unknown shell '${shell}'. Add to your shell config: source <(oc-sandbox completion zsh)"
-      ;;
+    # Check if completion line already exists (idempotent)
+    if grep -qF "$completion_line" "$rc_file" 2>/dev/null; then
+      info "Shell completions already set up in ${rc_file}"
+    else
+      echo '' >>"$rc_file"
+      echo "$completion_line" >>"$rc_file"
+      info "Added shell completions to ${rc_file}"
+    fi
+    ;;
+  bash)
+    warn "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  fish)
+    warn "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  *)
+    warn "Unknown shell '${shell}'. Add to your shell config: source <(oc-sandbox completion zsh)"
+    ;;
   esac
 
   # Seed the completion cache
@@ -312,24 +312,24 @@ setup_completions() {
 cleanup_completions() {
   local shell="$(basename "${SHELL:-}")"
   case "$shell" in
-    zsh)
-      local rc_file="${HOME}/.zshrc"
-      local completion_line='source <(oc-sandbox completion zsh)'
+  zsh)
+    local rc_file="${HOME}/.zshrc"
+    local completion_line='source <(oc-sandbox completion zsh)'
 
-      if [ -f "$rc_file" ]; then
-        if [ -L "$rc_file" ]; then
-          info ".zshrc is a symlink; removing completions from the target file"
-        fi
-
-        # Remove the completion line
-        local tmp_file
-        tmp_file=$(mktemp)
-        grep -vF "$completion_line" "$rc_file" > "$tmp_file" || true
-        cat "$tmp_file" > "$rc_file"
-        rm -f "$tmp_file"
-        info "Removed shell completions from ${rc_file}"
+    if [ -f "$rc_file" ]; then
+      if [ -L "$rc_file" ]; then
+        info ".zshrc is a symlink; removing completions from the target file"
       fi
-      ;;
+
+      # Remove the completion line
+      local tmp_file
+      tmp_file=$(mktemp)
+      grep -vF "$completion_line" "$rc_file" >"$tmp_file" || true
+      cat "$tmp_file" >"$rc_file"
+      rm -f "$tmp_file"
+      info "Removed shell completions from ${rc_file}"
+    fi
+    ;;
     # bash/fish: nothing to clean up (not implemented yet)
   esac
 }
@@ -371,8 +371,8 @@ _refresh_profiles_for_tag() {
   if podman image exists "$image_name" 2>/dev/null; then
     local profiles
     profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
-    echo "$profiles" > "$cache_dir/profiles-${tag_name}"
-    echo "profiles-${tag_name}_timestamp=${now}" >> "$cache_dir/cache.meta"
+    echo "$profiles" >"$cache_dir/profiles-${tag_name}"
+    echo "profiles-${tag_name}_timestamp=${now}" >>"$cache_dir/cache.meta"
   fi
 }
 
@@ -395,15 +395,15 @@ cmd_completion_refresh() {
   # Refresh images list
   local images
   images=$(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${IMAGE_BASE}:" | sed "s|^${IMAGE_BASE}:||" || true)
-  echo "$images" > "$cache_dir/images"
+  echo "$images" >"$cache_dir/images"
   # Update images_timestamp while preserving profile timestamps
   local existing_profiles_ts=""
   if [[ -f "$cache_dir/cache.meta" ]]; then
     existing_profiles_ts=$(grep "^profiles-.*_timestamp=" "$cache_dir/cache.meta" 2>/dev/null || true)
   fi
-  echo "images_timestamp=${now}" > "$cache_dir/cache.meta"
+  echo "images_timestamp=${now}" >"$cache_dir/cache.meta"
   if [[ -n "$existing_profiles_ts" ]]; then
-    echo "$existing_profiles_ts" >> "$cache_dir/cache.meta"
+    echo "$existing_profiles_ts" >>"$cache_dir/cache.meta"
   fi
 
   # Refresh profiles for specific tag or all tags
@@ -415,7 +415,7 @@ cmd_completion_refresh() {
     while IFS= read -r tag_name; do
       [ -z "$tag_name" ] && continue
       _refresh_profiles_for_tag "$tag_name" "$cache_dir" "$now"
-    done < "$cache_dir/images"
+    done <"$cache_dir/images"
   fi
 }
 
@@ -436,8 +436,7 @@ _oc-sandbox() {
   if (( CURRENT == 2 )); then
     _describe 'command' commands
     _arguments \
-      '--help[Show help message]' \
-      '-h[Show help message]'
+      '(-h --help)'{-h,--help}'[Show help message]'
     return
   fi
 
@@ -454,8 +453,7 @@ _oc-sandbox_build() {
   _arguments \
     '(-t --tag)'{-t,--tag}'[Tag for the built image]:tag:_oc-sandbox_image_tags' \
     '(-f --force)'{-f,--force}'[Force rebuild even if image exists]' \
-    '--help[Show help message]' \
-    '-h[Show help message]'
+    '(-h --help)'{-h,--help}'[Show help message]'
 }
 
 _oc-sandbox_run() {
@@ -467,22 +465,19 @@ _oc-sandbox_run() {
     '--no-gh-token[Skip GH_TOKEN detection]' \
     '--gh-token[GitHub token]:token:' \
     '--debug[Run /bin/bash instead of opencode]' \
-    '--help[Show help message]' \
-    '-h[Show help message]' \
+    '(-h --help)'{-h,--help}'[Show help message]' \
     ':path:_files -/'
 }
 
 _oc-sandbox_install() {
   _arguments \
     '--no-completions[Skip shell completion setup]' \
-    '--help[Show help message]' \
-    '-h[Show help message]'
+    '(-h --help)'{-h,--help}'[Show help message]'
 }
 
 _oc-sandbox_uninstall() {
   _arguments \
-    '--help[Show help message]' \
-    '-h[Show help message]'
+    '(-h --help)'{-h,--help}'[Show help message]'
 }
 
 _oc-sandbox_completion() {
@@ -490,8 +485,7 @@ _oc-sandbox_completion() {
     ':shell:_oc-sandbox_shells' \
     '--refresh[Force-refresh the completion cache]' \
     '--tag[Refresh cache for a specific tag only]:tag:_oc-sandbox_image_tags' \
-    '--help[Show help message]' \
-    '-h[Show help message]'
+    '(-h --help)'{-h,--help}'[Show help message]'
 }
 
 _oc-sandbox_image_tags() {
@@ -590,18 +584,18 @@ cmd_completion() {
   fi
 
   case "$shell_arg" in
-    zsh)
-      cmd_completion_zsh
-      ;;
-    bash)
-      echo "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
-      ;;
-    fish)
-      echo "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
-      ;;
-    *)
-      error "Unknown shell '${shell_arg}'. Available shells: zsh"
-      ;;
+  zsh)
+    cmd_completion_zsh
+    ;;
+  bash)
+    echo "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  fish)
+    echo "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  *)
+    error "Unknown shell '${shell_arg}'. Available shells: zsh"
+    ;;
   esac
 }
 
