@@ -302,7 +302,8 @@ cleanup_completions() {
         local tmp_file
         tmp_file=$(mktemp)
         grep -vF "$completion_line" "$rc_file" > "$tmp_file" || true
-        mv "$tmp_file" "$rc_file"
+        cat "$tmp_file" > "$rc_file"
+        rm -f "$tmp_file"
         info "Removed shell completions from ${rc_file}"
       fi
       ;;
@@ -313,7 +314,7 @@ cleanup_completions() {
 cleanup_cache() {
   local cache_dir="${HOME}/.cache/oc-sandbox"
   if [ -d "$cache_dir" ]; then
-    rm -rf "$cache_dir"
+    rm -rf "$cache_dir" || warn "Could not remove cache directory ${cache_dir}"
     info "Removed completion cache from ${cache_dir}"
   fi
 }
