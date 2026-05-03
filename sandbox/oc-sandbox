@@ -675,6 +675,9 @@ cmd_build() {
   fi
 
   info "Image ${image_name} built successfully."
+
+  # Refresh completion cache for the built tag
+  oc-sandbox completion --refresh --tag "$tag" >/dev/null 2>&1 || true
 }
 
 # Run subcommand
