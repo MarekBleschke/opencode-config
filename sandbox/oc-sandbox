@@ -96,10 +96,12 @@ Install oc-sandbox as a global command by creating a symlink in
 ~/.local/bin/ pointing to this script.
 
 Options:
-    -h, --help    Show this help message
+    --no-completions    Skip shell completion setup
+    -h, --help          Show this help message
 
 Examples:
-    oc-sandbox install    # Install to ~/.local/bin/oc-sandbox
+    oc-sandbox install                  # Install with shell completions
+    oc-sandbox install --no-completions  # Install without completions
 EOF
 }
 
@@ -140,8 +142,13 @@ EOF
 }
 
 cmd_install() {
+  local no_completions="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
+    --no-completions)
+      no_completions="true"
+      shift
+      ;;
     -h | --help)
       usage_install
       exit 0
@@ -183,6 +190,11 @@ cmd_install() {
   else
     ln -s "$script_path" "$install_path"
     info "Installed ${install_path}"
+  fi
+
+  # Set up shell completions (unless --no-completions)
+  if [ "$no_completions" = "false" ]; then
+    setup_completions
   fi
 
   # Warn if ~/.local/bin is not in PATH
