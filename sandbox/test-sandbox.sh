@@ -53,6 +53,17 @@ assert_stderr_contains() {
   fi
 }
 
+assert_stdout_contains() {
+  local output="$1"
+  local pattern="$2"
+  local description="$3"
+  if printf '%s' "$output" | grep -q -- "$pattern"; then
+    pass "$description"
+  else
+    fail "$description (expected pattern: '$pattern'): $output"
+  fi
+}
+
 # Helper: run a command with a timeout, capturing stdout and stderr
 # Returns the command's exit code if it exits before timeout, or 124 if killed by timeout
 run_with_timeout() {
@@ -1429,6 +1440,102 @@ OUTPUT=$("$OC_SANDBOX" run --help 2>&1)
 EXIT_CODE=$?
 assert_exit_code 0 "$EXIT_CODE" "run --help exits with 0"
 assert_stderr_contains "$OUTPUT" "--gh-token" "run --help mentions --gh-token"
+
+echo ""
+
+# --- Test 53: Completion help ---
+
+echo "--- Test 53: Completion help ---"
+
+OUTPUT=$("$OC_SANDBOX" completion --help 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "completion --help exits with 0"
+assert_stderr_contains "$OUTPUT" "Usage:" "completion --help contains usage"
+assert_stderr_contains "$OUTPUT" "zsh" "completion --help mentions zsh"
+assert_stderr_contains "$OUTPUT" "--refresh" "completion --help mentions --refresh"
+
+echo ""
+
+# --- Test 54: Completion zsh output ---
+
+echo "--- Test 54: Completion zsh output ---"
+
+OUTPUT=$("$OC_SANDBOX" completion zsh 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "completion zsh exits with 0"
+assert_stdout_contains "$OUTPUT" "#compdef oc-sandbox" "Zsh output contains compdef"
+assert_stdout_contains "$OUTPUT" "_oc-sandbox()" "Zsh output contains main function"
+assert_stdout_contains "$OUTPUT" "_oc-sandbox_build" "Zsh output contains build completion"
+assert_stdout_contains "$OUTPUT" "_oc-sandbox_run" "Zsh output contains run completion"
+assert_stdout_contains "$OUTPUT" "_oc-sandbox_image_tags" "Zsh output contains image tag completion"
+assert_stdout_contains "$OUTPUT" "_oc-sandbox_profiles" "Zsh output contains profile completion"
+
+echo ""
+
+# --- Test 55: Completion bash not implemented ---
+
+echo "--- Test 55: Completion bash not implemented ---"
+
+OUTPUT=$("$OC_SANDBOX" completion bash 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "completion bash exits with 0"
+assert_stdout_contains "$OUTPUT" "not yet implemented" "bash completion reports not implemented"
+
+echo ""
+
+# --- Test 56: Completion fish not implemented ---
+
+echo "--- Test 56: Completion fish not implemented ---"
+
+OUTPUT=$("$OC_SANDBOX" completion fish 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "completion fish exits with 0"
+assert_stdout_contains "$OUTPUT" "not yet implemented" "fish completion reports not implemented"
+
+echo ""
+
+# --- Test 57: Completion with no arguments ---
+
+echo "--- Test 57: Completion with no arguments ---"
+
+OUTPUT=$("$OC_SANDBOX" completion 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "completion with no args exits with error"
+else
+  fail "completion with no args should exit with error"
+fi
+assert_stderr_contains "$OUTPUT" "Shell name required" "Error mentions shell name required"
+
+echo ""
+
+# --- Test 58: Completion invalid shell ---
+
+echo "--- Test 58: Completion invalid shell ---"
+
+OUTPUT=$("$OC_SANDBOX" completion ksh 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "completion with invalid shell exits with error"
+else
+  fail "completion with invalid shell should exit with error"
+fi
+assert_stderr_contains "$OUTPUT" "Unknown shell" "Error mentions unknown shell"
+
+echo ""
+
+# --- Test 59: Completion unknown option ---
+
+echo "--- Test 59: Completion unknown option ---"
+
+OUTPUT=$("$OC_SANDBOX" completion --unknown 2>&1)
+EXIT_CODE=$?
+if [ "$EXIT_CODE" -ne 0 ]; then
+  pass "completion with unknown option exits with error"
+else
+  fail "completion with unknown option should exit with error"
+fi
+assert_stderr_contains "$OUTPUT" "Unknown option" "Error mentions unknown option"
 
 echo ""
 
