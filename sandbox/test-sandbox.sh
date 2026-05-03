@@ -1543,7 +1543,7 @@ echo ""
 
 echo "--- Test 60: Completion --refresh ---"
 
-OUTPUT=$("$OC_SANDBOX" completion --refresh 2>&1)
+OUTPUT=$(HOME="$TEST_DIR" "$OC_SANDBOX" completion --refresh 2>&1)
 EXIT_CODE=$?
 assert_exit_code 0 "$EXIT_CODE" "completion --refresh exits with 0"
 assert_stderr_contains "$OUTPUT" "podman not found" "completion --refresh warns about missing podman"
