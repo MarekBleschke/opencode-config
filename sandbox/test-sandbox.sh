@@ -1572,6 +1572,193 @@ assert_stderr_contains "$OUTPUT" "requires a value" "Error mentions --tag requir
 
 echo ""
 
+# --- Test 62: Cache cleanup via uninstall ---
+
+echo "--- Test 62: Cache cleanup via uninstall ---"
+
+mkdir -p "$TEST_DIR/.cache/oc-sandbox"
+echo "fake-image" > "$TEST_DIR/.cache/oc-sandbox/images"
+echo "fake-profile" > "$TEST_DIR/.cache/oc-sandbox/profiles-main"
+echo "images_timestamp=12345" > "$TEST_DIR/.cache/oc-sandbox/cache.meta"
+
+# Create a fake install so uninstall runs fully
+mkdir -p "$TEST_DIR/.local/bin"
+ln -s "$OC_SANDBOX" "$TEST_DIR/.local/bin/oc-sandbox"
+
+HOME="$TEST_DIR" "$OC_SANDBOX" uninstall >/dev/null 2>&1
+
+if [ ! -d "$TEST_DIR/.cache/oc-sandbox" ]; then
+  pass "Uninstall removes completion cache"
+else
+  fail "Uninstall should remove completion cache"
+fi
+
+echo ""
+
+# --- Test 63: Install adds completion to .zshrc ---
+
+echo "--- Test 63: Install adds completion to .zshrc ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_zshrc"
+mkdir -p "${TEMP_HOME}/.local/bin"
+echo '# existing config' > "${TEMP_HOME}/.zshrc"
+
+OUTPUT=$(HOME="$TEMP_HOME" SHELL="/bin/zsh" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install with zsh exits with 0"
+
+if grep -qF 'source <(oc-sandbox completion zsh)' "${TEMP_HOME}/.zshrc"; then
+  pass "Install adds completion source line to .zshrc"
+else
+  fail "Install should add completion source line to .zshrc"
+fi
+assert_stderr_contains "$OUTPUT" "Added shell completions" "Install reports adding completions"
+
+echo ""
+
+# --- Test 64: Install idempotency ---
+
+echo "--- Test 64: Install idempotency ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_idempotent"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+# First install
+HOME="$TEMP_HOME" SHELL="/bin/zsh" "$OC_SANDBOX" install >/dev/null 2>&1
+
+# Count occurrences
+COUNT=$(grep -cF 'source <(oc-sandbox completion zsh)' "${TEMP_HOME}/.zshrc" 2>/dev/null || echo "0")
+if [ "$COUNT" -eq 1 ]; then
+  pass "First install adds exactly one completion line"
+else
+  fail "First install should add exactly one completion line, got $COUNT"
+fi
+
+# Second install
+OUTPUT=$(HOME="$TEMP_HOME" SHELL="/bin/zsh" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Re-install exits with 0"
+
+COUNT=$(grep -cF 'source <(oc-sandbox completion zsh)' "${TEMP_HOME}/.zshrc" 2>/dev/null || echo "0")
+if [ "$COUNT" -eq 1 ]; then
+  pass "Second install does not add duplicate completion line"
+else
+  fail "Second install should not add duplicates, got $COUNT"
+fi
+assert_stderr_contains "$OUTPUT" "Already installed" "Re-install reports already installed"
+
+echo ""
+
+# --- Test 65: Install --no-completions ---
+
+echo "--- Test 65: Install --no-completions ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_nocomplete"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+OUTPUT=$(HOME="$TEMP_HOME" SHELL="/bin/zsh" "$OC_SANDBOX" install --no-completions 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install --no-completions exits with 0"
+
+if grep -qF 'source <(oc-sandbox completion zsh)' "${TEMP_HOME}/.zshrc" 2>/dev/null; then
+  fail "Install --no-completions should not modify .zshrc"
+else
+  pass "Install --no-completions does not modify .zshrc"
+fi
+
+echo ""
+
+# --- Test 66: Install with symlinked .zshrc ---
+
+echo "--- Test 66: Install with symlinked .zshrc ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_symlink"
+mkdir -p "${TEMP_HOME}/.local/bin"
+mkdir -p "${TEMP_HOME}/real_config"
+echo '# real zshrc' > "${TEMP_HOME}/real_config/.zshrc"
+ln -s "${TEMP_HOME}/real_config/.zshrc" "${TEMP_HOME}/.zshrc"
+
+OUTPUT=$(HOME="$TEMP_HOME" SHELL="/bin/zsh" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install with symlinked .zshrc exits with 0"
+
+# Completion should be in the real file, not the symlink
+if grep -qF 'source <(oc-sandbox completion zsh)' "${TEMP_HOME}/real_config/.zshrc"; then
+  pass "Install adds completions to real file behind symlink"
+else
+  fail "Install should add completions to real file behind symlink"
+fi
+assert_stderr_contains "$OUTPUT" "symlink" "Install reports symlink handling"
+
+echo ""
+
+# --- Test 67: Uninstall removes completion from .zshrc ---
+
+echo "--- Test 67: Uninstall removes completion from .zshrc ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_uninstall_zshrc"
+mkdir -p "${TEMP_HOME}/.local/bin"
+ln -s "$OC_SANDBOX" "${TEMP_HOME}/.local/bin/oc-sandbox"
+
+# Pre-populate .zshrc with completion line
+cat > "${TEMP_HOME}/.zshrc" <<EOF
+# Some config
+source <(oc-sandbox completion zsh)
+# More config
+EOF
+
+OUTPUT=$(HOME="$TEMP_HOME" SHELL="/bin/zsh" "$OC_SANDBOX" uninstall 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Uninstall with zsh exits with 0"
+
+if grep -qF 'source <(oc-sandbox completion zsh)' "${TEMP_HOME}/.zshrc" 2>/dev/null; then
+  fail "Uninstall should remove completion source line"
+else
+  pass "Uninstall removes completion source line from .zshrc"
+fi
+assert_stderr_contains "$OUTPUT" "Removed shell completions" "Uninstall reports removing completions"
+
+echo ""
+
+# --- Test 68: Install with unknown shell ---
+
+echo "--- Test 68: Install with unknown shell ---"
+
+TEMP_HOME="${TEST_DIR}/temp_home_unknown_shell"
+mkdir -p "${TEMP_HOME}/.local/bin"
+
+OUTPUT=$(HOME="$TEMP_HOME" SHELL="/bin/unknownshell" "$OC_SANDBOX" install 2>&1)
+EXIT_CODE=$?
+assert_exit_code 0 "$EXIT_CODE" "Install with unknown shell exits with 0"
+assert_stderr_contains "$OUTPUT" "Unknown shell" "Install warns about unknown shell"
+
+echo ""
+
+# --- Test 69: Cache file format ---
+
+echo "--- Test 69: Cache file format ---"
+
+# Manually create cache files to verify format
+mkdir -p "$TEST_DIR/.cache/oc-sandbox"
+printf 'main\nexperiment\n' > "$TEST_DIR/.cache/oc-sandbox/images"
+printf 'dev\nweb-dev\n' > "$TEST_DIR/.cache/oc-sandbox/profiles-main"
+
+# Verify one-item-per-line
+LINE_COUNT=$(wc -l < "$TEST_DIR/.cache/oc-sandbox/images" | tr -d ' ')
+if [ "$LINE_COUNT" -eq 2 ]; then
+  pass "Cache file has correct line count"
+else
+  fail "Cache file should have 2 lines, got $LINE_COUNT"
+fi
+
+if grep -q 'main' "$TEST_DIR/.cache/oc-sandbox/images"; then
+  pass "Cache file contains expected tag"
+else
+  fail "Cache file should contain 'main'"
+fi
+
+echo ""
+
 # --- Summary ---
 
 echo "=== Test Summary ==="
