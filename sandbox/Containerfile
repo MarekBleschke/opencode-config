@@ -11,16 +11,17 @@ RUN apt-get update && \
   curl \
   ca-certificates \
   openssh-client \
+  zsh \
   && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
 RUN mkdir -p -m 755 /etc/apt/keyrings && \
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends gh && \
-    rm -rf /var/lib/apt/lists/*
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+  chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+  apt-get update && \
+  apt-get install -y --no-install-recommends gh && \
+  rm -rf /var/lib/apt/lists/*
 
 # Install opencode CLI with checksum verification
 ARG OPENCODE_INSTALL_SHA256
@@ -42,13 +43,13 @@ RUN groupadd -g 1001 sandbox && \
 
 # Pre-configure GitHub SSH host keys so git+ssh works without interactive prompt
 RUN mkdir -p /home/sandbox/.ssh && \
-    ssh-keyscan github.com >> /home/sandbox/.ssh/known_hosts && \
-    chown -R sandbox:sandbox /home/sandbox/.ssh
+  ssh-keyscan github.com >> /home/sandbox/.ssh/known_hosts && \
+  chown -R sandbox:sandbox /home/sandbox/.ssh
 
 # Create directory structure for runtime bind mounts (SSH keys, auth config)
 # Must set ownership to sandbox:sandbox so the user can write to these directories
 RUN mkdir -p /home/sandbox/.local/share/opencode && \
-    chown -R sandbox:sandbox /home/sandbox/.local
+  chown -R sandbox:sandbox /home/sandbox/.local
 
 # Copy the local opencode-config repository into the image
 COPY --chown=sandbox:sandbox . /home/sandbox/opencode-config/
@@ -59,6 +60,8 @@ RUN git config --global --add safe.directory /home/sandbox/opencode-config && \
 
 # Switch to sandbox user
 USER sandbox
+
+RUN touch ~/.zshrc
 
 # Pre-warm opencode plugins to avoid ~10s hang on first interactive run.
 # Tolerate failure in case network is unavailable during build.
