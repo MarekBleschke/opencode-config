@@ -17,6 +17,7 @@ _resolve_script_dir() {
 _resolve_script_dir
 CONTAINERFILE="${SCRIPT_DIR}/Containerfile"
 OPENCODE_INSTALL_SHA256_FILE="${SCRIPT_DIR}/opencode-install.sha256"
+COMPLETION_ZSH="${SCRIPT_DIR}/completion_zsh"
 IMAGE_BASE="localhost/opencode-sandbox"
 DEFAULT_TAG="main"
 DEFAULT_PROFILE="dev"
@@ -36,6 +37,7 @@ Commands:
     run         Run opencode in a sandbox
     install     Install oc-sandbox as a global command
     uninstall   Uninstall the global oc-sandbox command
+    completion  Generate shell completion scripts
 
 Run 'oc-sandbox <command> --help' for more information on a command.
 
@@ -96,10 +98,12 @@ Install oc-sandbox as a global command by creating a symlink in
 ~/.local/bin/ pointing to this script.
 
 Options:
-    -h, --help    Show this help message
+    --no-completions    Skip shell completion setup
+    -h, --help          Show this help message
 
 Examples:
-    oc-sandbox install    # Install to ~/.local/bin/oc-sandbox
+    oc-sandbox install                  # Install with shell completions
+    oc-sandbox install --no-completions  # Install without completions
 EOF
 }
 
@@ -108,19 +112,45 @@ usage_uninstall() {
 Usage: oc-sandbox uninstall
 
 Uninstall the global oc-sandbox command by removing the symlink
-from ~/.local/bin/.
+from ~/.local/bin/. Also removes shell completion setup and cache.
 
 Options:
     -h, --help    Show this help message
 
 Examples:
-    oc-sandbox uninstall    # Remove ~/.local/bin/oc-sandbox symlink
+    oc-sandbox uninstall    # Remove symlink, completions, and cache
+EOF
+}
+
+usage_completion() {
+  cat <<EOF
+Usage: oc-sandbox completion <shell>
+
+Generate shell completion scripts for oc-sandbox.
+
+Shells:
+    zsh         Generate Zsh completion script
+
+Options:
+    --refresh           Force-refresh the completion cache
+    --tag <TAG>         Refresh cache for a specific tag only (used with --refresh)
+    -h, --help          Show this help message
+
+Examples:
+    source <(oc-sandbox completion zsh)    # Enable Zsh completions
+    oc-sandbox completion --refresh        # Manually refresh all cached data
+    oc-sandbox completion --refresh --tag main  # Refresh cache for tag "main" only
 EOF
 }
 
 cmd_install() {
+  local no_completions="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
+    --no-completions)
+      no_completions="true"
+      shift
+      ;;
     -h | --help)
       usage_install
       exit 0
@@ -150,6 +180,10 @@ cmd_install() {
     current_target="$(readlink "$install_path")"
     if [ "$current_target" = "$script_path" ]; then
       info "Already installed at ${install_path}"
+      # Still set up completions unless --no-completions was specified
+      if [ "$no_completions" = "false" ]; then
+        setup_completions
+      fi
       exit 0
     else
       info "Updating symlink to point to ${script_path}..."
@@ -162,6 +196,11 @@ cmd_install() {
   else
     ln -s "$script_path" "$install_path"
     info "Installed ${install_path}"
+  fi
+
+  # Set up shell completions (unless --no-completions)
+  if [ "$no_completions" = "false" ]; then
+    setup_completions
   fi
 
   # Warn if ~/.local/bin is not in PATH
@@ -209,6 +248,12 @@ cmd_uninstall() {
 
   rm "$install_path"
   info "Uninstalled ${install_path}"
+
+  # Clean up shell completions
+  cleanup_completions
+
+  # Clean up completion cache
+  cleanup_cache
 }
 
 error() {
@@ -222,6 +267,80 @@ warn() {
 
 info() {
   echo -e "${GREEN}$1${NC}"
+}
+
+setup_completions() {
+  local shell="$(basename "${SHELL:-}")"
+  case "$shell" in
+  zsh)
+    local rc_file="${HOME}/.zshrc"
+    local completion_line='source <(oc-sandbox completion zsh)'
+
+    # Handle symlinked .zshrc
+    if [ -L "$rc_file" ]; then
+      info ".zshrc is a symlink; completions will be added to the target file"
+    fi
+
+    # Create .zshrc if it doesn't exist
+    if [ ! -f "$rc_file" ]; then
+      touch "$rc_file"
+    fi
+
+    # Check if completion line already exists (idempotent)
+    if grep -qF "$completion_line" "$rc_file" 2>/dev/null; then
+      info "Shell completions already set up in ${rc_file}"
+    else
+      echo '' >>"$rc_file"
+      echo "$completion_line" >>"$rc_file"
+      info "Added shell completions to ${rc_file}"
+    fi
+    ;;
+  bash)
+    warn "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  fish)
+    warn "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  *)
+    warn "Unknown shell '${shell}'. Add to your shell config: source <(oc-sandbox completion zsh)"
+    ;;
+  esac
+
+  # Seed the completion cache
+  oc-sandbox completion --refresh >/dev/null 2>&1 || true
+}
+
+cleanup_completions() {
+  local shell="$(basename "${SHELL:-}")"
+  case "$shell" in
+  zsh)
+    local rc_file="${HOME}/.zshrc"
+    local completion_line='source <(oc-sandbox completion zsh)'
+
+    if [ -f "$rc_file" ]; then
+      if [ -L "$rc_file" ]; then
+        info ".zshrc is a symlink; removing completions from the target file"
+      fi
+
+      # Remove the completion line
+      local tmp_file
+      tmp_file=$(mktemp)
+      grep -vF "$completion_line" "$rc_file" >"$tmp_file" || true
+      cat "$tmp_file" >"$rc_file"
+      rm -f "$tmp_file"
+      info "Removed shell completions from ${rc_file}"
+    fi
+    ;;
+    # bash/fish: nothing to clean up (not implemented yet)
+  esac
+}
+
+cleanup_cache() {
+  local cache_dir="${HOME}/.cache/oc-sandbox"
+  if [ -d "$cache_dir" ]; then
+    rm -rf "$cache_dir" || warn "Could not remove cache directory ${cache_dir}"
+    info "Removed completion cache from ${cache_dir}"
+  fi
 }
 
 check_podman() {
@@ -242,6 +361,128 @@ list_profiles() {
       echo "  - $profile"
     done
   fi
+}
+
+_refresh_profiles_for_tag() {
+  local tag_name="$1"
+  local cache_dir="$2"
+  local now="$3"
+  local image_name="${IMAGE_BASE}:${tag_name}"
+
+  if podman image exists "$image_name" 2>/dev/null; then
+    local profiles
+    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+    echo "$profiles" >"$cache_dir/profiles-${tag_name}"
+    echo "profiles-${tag_name}_timestamp=${now}" >>"$cache_dir/cache.meta"
+  fi
+}
+
+cmd_completion_refresh() {
+  local specific_tag="${1:-}"
+
+  # Create cache directory if needed
+  local cache_dir="${HOME}/.cache/oc-sandbox"
+  mkdir -p "$cache_dir"
+
+  # Check if podman is available
+  if ! command -v podman &>/dev/null; then
+    warn "podman not found. Cache refresh skipped."
+    return 0
+  fi
+
+  local now
+  now=$(date +%s)
+
+  # Refresh images list
+  local images
+  images=$(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${IMAGE_BASE}:" | sed "s|^${IMAGE_BASE}:||" || true)
+  echo "$images" >"$cache_dir/images"
+  # Update images_timestamp while preserving profile timestamps
+  local existing_profiles_ts=""
+  if [[ -f "$cache_dir/cache.meta" ]]; then
+    existing_profiles_ts=$(grep "^profiles-.*_timestamp=" "$cache_dir/cache.meta" 2>/dev/null || true)
+  fi
+  echo "images_timestamp=${now}" >"$cache_dir/cache.meta"
+  if [[ -n "$existing_profiles_ts" ]]; then
+    echo "$existing_profiles_ts" >>"$cache_dir/cache.meta"
+  fi
+
+  # Refresh profiles for specific tag or all tags
+  if [ -n "$specific_tag" ]; then
+    _refresh_profiles_for_tag "$specific_tag" "$cache_dir" "$now"
+  else
+    # Refresh profiles for all known tags
+    local tag_name
+    while IFS= read -r tag_name; do
+      [ -z "$tag_name" ] && continue
+      _refresh_profiles_for_tag "$tag_name" "$cache_dir" "$now"
+    done <"$cache_dir/images"
+  fi
+}
+
+cmd_completion_zsh() {
+  cat $COMPLETION_ZSH
+}
+
+cmd_completion() {
+  local refresh="false"
+  local tag=""
+  local shell_arg=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --refresh)
+      refresh="true"
+      shift
+      ;;
+    --tag)
+      if [ -z "${2:-}" ]; then
+        error "Option --tag requires a value."
+      fi
+      tag="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage_completion
+      exit 0
+      ;;
+    -*)
+      error "Unknown option: $1\nUse 'oc-sandbox completion --help' for usage information."
+      ;;
+    *)
+      # Shell argument
+      if [ -n "$shell_arg" ]; then
+        error "Unknown argument: $1\nUse 'oc-sandbox completion --help' for usage information."
+      fi
+      shell_arg="$1"
+      shift
+      ;;
+    esac
+  done
+
+  if [ "$refresh" = "true" ]; then
+    cmd_completion_refresh "$tag"
+    return
+  fi
+
+  if [ -z "${shell_arg:-}" ]; then
+    error "Shell name required. Use 'oc-sandbox completion --help' for available shells."
+  fi
+
+  case "$shell_arg" in
+  zsh)
+    cmd_completion_zsh
+    ;;
+  bash)
+    echo "Bash completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  fish)
+    echo "Fish completion is not yet implemented. See 'oc-sandbox completion --help' for available shells."
+    ;;
+  *)
+    error "Unknown shell '${shell_arg}'. Available shells: zsh"
+    ;;
+  esac
 }
 
 # Build subcommand
@@ -317,6 +558,9 @@ cmd_build() {
   fi
 
   info "Image ${image_name} built successfully."
+
+  # Refresh completion cache for the built tag
+  oc-sandbox completion --refresh --tag "$tag" >/dev/null 2>&1 || true
 }
 
 # Run subcommand
@@ -589,6 +833,10 @@ install)
 uninstall)
   shift
   cmd_uninstall "$@"
+  ;;
+completion)
+  shift
+  cmd_completion "$@"
   ;;
 --help | -h)
   usage_main

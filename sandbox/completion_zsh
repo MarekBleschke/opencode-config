@@ -1,0 +1,119 @@
+#compdef oc-sandbox
+
+_oc-sandbox() {
+  local curcontext="$curcontext" state line
+  local -a commands
+  commands=(
+    'build:Build a container image'
+    'run:Run opencode in a sandbox'
+    'install:Install oc-sandbox as a global command'
+    'uninstall:Uninstall the global oc-sandbox command'
+    'completion:Generate shell completion scripts'
+  )
+
+  _arguments -C \
+    '(-h --help)--help[Show help message]' \
+    '1: :->command' \
+    '*:: :->args'
+
+  case $state in
+  command)
+    _describe 'command' commands
+    ;;
+  args)
+    case $words[1] in
+    build) _oc-sandbox_build ;;
+    run) _oc-sandbox_run ;;
+    install) _oc-sandbox_install ;;
+    uninstall) _oc-sandbox_uninstall ;;
+    completion) _oc-sandbox_completion ;;
+    esac
+    ;;
+  esac
+}
+_oc-sandbox_build() {
+  _arguments \
+    '(-t --tag)--tag[Tag for the built image]:tag:_oc-sandbox_image_tags' \
+    '(-f --force)--force[Force rebuild even if image exists]' \
+    '(-h --help)--help[Show help message]'
+}
+
+_oc-sandbox_run() {
+  _arguments \
+    '(-t --tag)--tag[Tag of the image to run]:tag:_oc-sandbox_image_tags' \
+    '(-p --profile)--profile[Opencode profile to activate]:profile:_oc-sandbox_profiles' \
+    '--no-ssh[Skip mounting SSH keys]' \
+    '--no-auth[Skip mounting auth.json]' \
+    '--no-gh-token[Skip GH_TOKEN detection]' \
+    '--gh-token[GitHub token]:token:' \
+    '--debug[Run /bin/bash instead of opencode]' \
+    '(-h --help)--help[Show help message]' \
+    ':path:_files -/'
+}
+
+_oc-sandbox_install() {
+  _arguments \
+    '--no-completions[Skip shell completion setup]' \
+    '(-h --help)--help[Show help message]'
+}
+
+_oc-sandbox_uninstall() {
+  _arguments \
+    '(-h --help)--help[Show help message]'
+}
+
+_oc-sandbox_completion() {
+  _arguments \
+    ':shell:_oc-sandbox_shells' \
+    '--refresh[Force-refresh the completion cache]' \
+    '--tag[Refresh cache for a specific tag only]:tag:_oc-sandbox_image_tags' \
+    '(-h --help)--help[Show help message]'
+}
+
+_oc-sandbox_image_tags() {
+  local cache_file="$HOME/.cache/oc-sandbox/images"
+  if [[ -f "$cache_file" ]]; then
+    _values 'image tags' $(cat "$cache_file")
+  fi
+  _oc-sandbox_maybe_refresh_cache
+}
+
+_oc-sandbox_profiles() {
+  local tag="main"
+  local i
+  for ((i = 2; i < CURRENT; i++)); do
+    if [[ "$words[i]" == --tag || "$words[i]" == -t ]]; then
+      tag="$words[i+1]"
+      break
+    fi
+    if [[ "$words[i]" == --tag=* ]]; then
+      tag="${words[i]#--tag=}"
+      break
+    fi
+  done
+
+  local cache_file="$HOME/.cache/oc-sandbox/profiles-${tag}"
+  if [[ -f "$cache_file" ]]; then
+    _values 'profiles' $(cat "$cache_file")
+  fi
+  _oc-sandbox_maybe_refresh_cache
+}
+
+_oc-sandbox_shells() {
+  _values 'shells' zsh
+}
+
+_oc-sandbox_maybe_refresh_cache() {
+  local meta_file="$HOME/.cache/oc-sandbox/cache.meta"
+  local images_ts=0
+  if [[ -f "$meta_file" ]]; then
+    images_ts=$(grep '^images_timestamp=' "$meta_file" 2>/dev/null | cut -d= -f2)
+  fi
+  local now=$(($(date +%s)))
+  local max_age=$((24 * 60 * 60))
+  if (((now - images_ts) > max_age)); then
+    (oc-sandbox completion --refresh >/dev/null 2>&1 &)
+  fi
+}
+
+compdef _oc-sandbox oc-sandbox
