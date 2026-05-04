@@ -2,8 +2,8 @@
 - [x] commands for dev profile
 - [x] sandbox
 - [x] install gh CLI for PRs (with mounting token like for opencode)
-- [ ] add shell completion
-- [ ] add README
+- [x] add shell completion
+- [x] add README
 - [ ] improve AGENTS.md: project structure, tests, tech stack
 - [ ] do better opencode warmup on build phase
 - [ ] improve workspace-setup:
