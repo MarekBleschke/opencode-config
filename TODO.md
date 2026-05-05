@@ -4,8 +4,8 @@
 - [x] install gh CLI for PRs (with mounting token like for opencode)
 - [x] add shell completion
 - [x] add README
-- [ ] improve AGENTS.md: project structure, tests, tech stack
-- [ ] do better opencode warmup on build phase
+- [x] improve AGENTS.md: project structure, tests, tech stack
+- ~~[ ] do better opencode warmup on build phase~~
 - [ ] improve workspace-setup:
   - add option first commit on new branch when there are changes
   - strict list of branch prefixes
