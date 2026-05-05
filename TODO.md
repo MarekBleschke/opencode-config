@@ -5,7 +5,7 @@
 - [x] add shell completion
 - [x] add README
 - [x] improve AGENTS.md: project structure, tests, tech stack
-- [ ] do better opencode warmup on build phase
+- ~~[ ] do better opencode warmup on build phase~~
 - [ ] improve workspace-setup:
   - add option first commit on new branch when there are changes
   - strict list of branch prefixes
