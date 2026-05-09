@@ -234,11 +234,17 @@ cmd_install() {
 
     if [ -n "$git_name" ] || [ -n "$git_email" ]; then
       if [ -n "$git_name" ]; then
-        sed -i.bak "s/^user_name =.*/user_name = ${git_name}/" "$config_file"
+        # Escape & for sed replacement and use | as delimiter to handle / in names
+        local escaped_name
+        escaped_name="$(echo "$git_name" | sed 's/&/\\&/g')"
+        sed -i.bak "s|^user_name =.*|user_name = ${escaped_name}|" "$config_file"
         rm -f "$config_file.bak"
       fi
       if [ -n "$git_email" ]; then
-        sed -i.bak "s/^user_email =.*/user_email = ${git_email}/" "$config_file"
+        # Escape & for sed replacement and use | as delimiter to handle / in emails
+        local escaped_email
+        escaped_email="$(echo "$git_email" | sed 's/&/\\&/g')"
+        sed -i.bak "s|^user_email =.*|user_email = ${escaped_email}|" "$config_file"
         rm -f "$config_file.bak"
       fi
       info "Populated git identity in config"
