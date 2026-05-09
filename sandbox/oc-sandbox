@@ -637,9 +637,54 @@ cmd_build() {
     error "Checksum file is empty: $OPENCODE_INSTALL_SHA256_FILE"
   fi
 
+  # Verify config file exists
+  local config_file="${HOME}/.config/oc-sandbox/config"
+  if [ ! -f "$config_file" ]; then
+    error "Config file not found at ${config_file}. Run 'oc-sandbox install' first."
+  fi
+
+  # Build args array
+  local build_args=(
+    "--build-arg" "OPENCODE_INSTALL_SHA256=${sha256}"
+  )
+
+  # Add git identity build args
+  local git_user_name git_user_email
+  git_user_name="$(_read_config_value "$config_file" "git" "user_name")"
+  git_user_email="$(_read_config_value "$config_file" "git" "user_email")"
+  build_args+=("--build-arg" "GIT_USER_NAME=${git_user_name}")
+  build_args+=("--build-arg" "GIT_USER_EMAIL=${git_user_email}")
+
+  # Add gitignore content
+  local gitignore_content=""
+  if [ -f "${HOME}/.gitignore" ]; then
+    gitignore_content="$(base64 < "${HOME}/.gitignore")"
+  fi
+  build_args+=("--build-arg" "GITIGNORE_CONTENT=${gitignore_content}")
+
+  # Add model build args from [profile.dev]
+  local agent_name model_value arg_name
+  local agents=(
+    "brainstorm"
+    "planner"
+    "debugger"
+    "execution-orchestrator"
+    "software-engineer"
+    "senior-software-engineer"
+    "code-reviewer"
+    "spec-reviewer"
+    "utility"
+  )
+
+  for agent_name in "${agents[@]}"; do
+    model_value="$(_read_config_value "$config_file" "profile.dev" "$agent_name")"
+    arg_name="MODEL_DEV_$(echo "$agent_name" | tr 'a-z-' 'A-Z_')"
+    build_args+=("--build-arg" "${arg_name}=${model_value}")
+  done
+
   info "Building container image ${image_name}..."
   if ! podman build \
-    --build-arg "OPENCODE_INSTALL_SHA256=${sha256}" \
+    "${build_args[@]}" \
     -t "$image_name" \
     -f "$CONTAINERFILE" \
     "${SCRIPT_DIR}/.."; then
