@@ -83,3 +83,19 @@ All bash scripts must run correctly on both macOS (BSD userland) and Linux (GNU 
 - The CLI script (`sandbox/oc-sandbox`) uses `set -euo pipefail` and long-form flag parsing with `while/case`.
 - Error output uses colored prefixes: `Error:` (red), `Warning:` (yellow), info (green) — via the `error()`, `warn()`, `info()` functions.
 - The script resolves its own directory with `_resolve_script_dir()` to find `Containerfile` relative to itself. Do not hardcode paths.
+
+## Build-Time Customization
+
+The `sandbox/bootstrap.sh` script is the designated place for all build-time customization logic. This includes:
+
+- **Placeholder replacement** in profile agent files (e.g., replacing `{{MODEL_DEV_*}}` placeholders with values from the build configuration)
+- **File generation from build arguments** (e.g., writing `.gitconfig` and `.gitignore` from `GIT_USER_NAME`, `GIT_USER_EMAIL`, and `GITIGNORE_CONTENT` build args)
+
+When adding new build-time behavior:
+
+1. Pass the required data as `ARG` declarations in `sandbox/Containerfile`
+2. Forward them as environment variables to `bootstrap.sh` in the `RUN` command
+3. Implement the customization logic in `bootstrap.sh`
+4. Update `AGENTS.md` to document the new build arguments
+
+Do not add build-time logic outside of `bootstrap.sh` — keeping it centralized makes the build process easier to understand and maintain.
