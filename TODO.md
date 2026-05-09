@@ -1,19 +1,4 @@
 # TODO
-- [x] commands for dev profile
-- [x] sandbox
-- [x] install gh CLI for PRs (with mounting token like for opencode)
-- [x] add shell completion
-- [x] add README
-- [x] improve AGENTS.md: project structure, tests, tech stack
-- ~~[ ] do better opencode warmup on build phase~~
-- [x] create .gitconfig with [user] section based on ~/.gitconfig (if not available skip), and copy ~/.gitignore. This should be done while building image. Utilize bootstrap.sh
-- [x] improve workspace-setup skill:
-  - add option first commit on new branch when there are changes
-  - strict list of branch prefixes (like feature/, bugfix/, hotfix/, release/) and ask to select one when creating new branch
-- [x] Improved configuration for oc-sandbox:
-  - `oc-sandbox install` creates configuration file 
-  - configuration file contains models mapping for agents in profiles:
-    - direct mapping `profile.agent = model`
-    - initial config should be in sandbox/ dir (plain file)
-    - dev profile agents models updated to have placeholders
-    - utilize bootstrap.sh for replacing placeholders
+- [ ] setup default profile in config
+- [ ] rename opencode-config to oc-sandbox
+- [ ] rename `dev` profile to `superpowers`
