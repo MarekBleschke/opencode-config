@@ -1,6 +1,6 @@
 ---
 description: "Root-cause investigation agent for bugs, test failures, and unexpected behavior. Investigation and fixes. Root-cause first."
-model: opencode-go/glm-5.1
+model: {{MODEL_DEV_DEBUGGER}}
 mode: primary
 temperature: 0.3
 color: warning

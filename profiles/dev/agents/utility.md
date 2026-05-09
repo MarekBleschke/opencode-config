@@ -1,6 +1,6 @@
 ---
 description: "Lightweight utility agent for ad-hoc housekeeping tasks outside the plan: gitignore updates, config tweaks, untracked file cleanup, small file edits."
-model: opencode-go/minimax-m2.7
+model: {{MODEL_DEV_UTILITY}}
 mode: all
 temperature: 0.2
 color: info
