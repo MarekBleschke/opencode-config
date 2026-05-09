@@ -79,9 +79,37 @@ You are on the <name of current branch> branch. Before executing a plan, you nee
 Which would you prefer?
 ```
 
-**Feature branch flow:** create and switch to the feature branch
+After the user selects a flow, present the prefix selection:
 
-**Worktree flow:** use `skill` tool to load `superpowers/using-git-worktrees` skill and follow it to create a worktree.
+```
+Select a branch prefix:
+1. feature/     — New feature or enhancement
+2. bugfix/      — Bug fixes
+3. hotfix/      — Critical fixes for production
+4. release/     — Release preparation
+5. chore/       — Maintenance tasks, refactoring
+6. experiment/  — Exploratory work, prototypes
+```
+
+The user selects a prefix number, then provides the branch name. Construct the full branch name as `<prefix><branch-name>` (e.g., `feature/add-config-system`).
+
+**Feature branch flow:** create and switch to the feature branch with `git checkout -b <full-branch-name>`
+
+**Worktree flow:** use `skill` tool to load `superpowers/using-git-worktrees` skill and follow it to create a worktree. Pass the full branch name when creating the worktree.
+
+**First commit on new branch (feature branch only):**
+
+If the user selected "Create a feature branch" AND there are uncommitted changes in the working tree (carried over from Step 2 where the user chose option 3 "Leave them as-is"), ask after creating the branch:
+
+```
+You have uncommitted changes on the new branch <full-branch-name>.
+Would you like to commit them now?
+
+1. Yes, commit all changes with a descriptive message
+2. No, leave them uncommitted
+```
+
+If "Yes", prompt for a commit message, then run `git add -A && git commit -m "<message>"`.
 
 ### Step 4: Report
 

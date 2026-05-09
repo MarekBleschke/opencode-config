@@ -1,11 +1,5 @@
 # TODO
-- [x] commands for dev profile
-- [x] sandbox
-- [x] install gh CLI for PRs (with mounting token like for opencode)
-- [x] add shell completion
-- [x] add README
-- [x] improve AGENTS.md: project structure, tests, tech stack
-- ~~[ ] do better opencode warmup on build phase~~
-- [ ] improve workspace-setup:
-  - add option first commit on new branch when there are changes
-  - strict list of branch prefixes
+- [ ] setup default profile in config
+- [ ] rename opencode-config to oc-sandbox
+- [ ] rename `dev` profile to `superpowers`
+- [ ] add id-rsa key path in config

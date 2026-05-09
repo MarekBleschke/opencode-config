@@ -1,6 +1,6 @@
 ---
 description: "Code quality reviewer for bugs, regressions, test gaps, and maintainability. Read-only review. No edits."
-model: opencode-go/glm-5.1
+model: {{MODEL_DEV_CODE_REVIEWER}}
 mode: subagent
 hidden: true
 temperature: 0.2
