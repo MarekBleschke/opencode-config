@@ -87,10 +87,6 @@ USER sandbox
 
 RUN touch ~/.zshrc
 
-# Pre-warm opencode plugins to avoid ~10s hang on first interactive run.
-# Tolerate failure in case network is unavailable during build.
-RUN opencode run --agent plan "say hi" || true
-
 # Set working directory to /workspace (will be bind-mounted at runtime)
 WORKDIR /workspace
 
