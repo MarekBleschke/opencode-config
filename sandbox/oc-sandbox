@@ -658,7 +658,7 @@ cmd_build() {
   # Add gitignore content
   local gitignore_content=""
   if [ -f "${HOME}/.gitignore" ]; then
-    gitignore_content="$(base64 < "${HOME}/.gitignore")"
+    gitignore_content="$(base64 < "${HOME}/.gitignore" | tr -d '\n')"
   fi
   build_args+=("--build-arg" "GITIGNORE_CONTENT=${gitignore_content}")
 
