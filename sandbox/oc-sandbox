@@ -775,6 +775,21 @@ cmd_run() {
     error "Cannot use --gh-token with --no-gh-token"
   fi
 
+  # If no profile from --profile flag, try config default
+  if [ -z "$profile" ]; then
+    local config_file="${HOME}/.config/oc-sandbox/config"
+    if [ -f "$config_file" ]; then
+      profile="$(_read_config_value "$config_file" "general" "default_profile")"
+    fi
+    if [ -z "$profile" ]; then
+      error "No default profile configured and --profile not specified.
+Set a default profile in ${config_file:-~/.config/oc-sandbox/config}:
+  [general]
+  default_profile = base
+Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
+    fi
+  fi
+
   check_podman
 
   local image_name="${IMAGE_BASE}:${tag}"
