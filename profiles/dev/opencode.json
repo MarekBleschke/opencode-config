@@ -7,7 +7,7 @@
     },
     "external_directory": {
       "*": "ask",
-      "/home/sandbox/opencode-config/submodules/*": "allow",
+      "/home/sandbox/oc-sandbox/submodules/*": "allow",
       "/tmp": "allow",
       "/tmp/*": "allow",
       "/private/tmp": "allow",

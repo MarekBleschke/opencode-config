@@ -63,11 +63,11 @@ RUN mkdir -p /home/sandbox/.ssh && \
 RUN mkdir -p /home/sandbox/.local/share/opencode && \
   chown -R sandbox:sandbox /home/sandbox/.local
 
-# Copy the local opencode-config repository into the image
-COPY --chown=sandbox:sandbox . /home/sandbox/opencode-config/
+# Copy the local oc-sandbox repository into the image
+COPY --chown=sandbox:sandbox . /home/sandbox/oc-sandbox/
 
 # Configure git to trust the repository directory and run bootstrap script as root
-RUN git config --global --add safe.directory /home/sandbox/opencode-config && \
+RUN git config --global --add safe.directory /home/sandbox/oc-sandbox && \
   GIT_USER_NAME="$GIT_USER_NAME" \
   GIT_USER_EMAIL="$GIT_USER_EMAIL" \
   GITIGNORE_CONTENT="$GITIGNORE_CONTENT" \
@@ -80,7 +80,7 @@ RUN git config --global --add safe.directory /home/sandbox/opencode-config && \
   MODEL_DEV_CODE_REVIEWER="$MODEL_DEV_CODE_REVIEWER" \
   MODEL_DEV_SPEC_REVIEWER="$MODEL_DEV_SPEC_REVIEWER" \
   MODEL_DEV_UTILITY="$MODEL_DEV_UTILITY" \
-  /home/sandbox/opencode-config/sandbox/bootstrap.sh
+  /home/sandbox/oc-sandbox/sandbox/bootstrap.sh
 
 # Switch to sandbox user
 USER sandbox

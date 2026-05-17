@@ -5,7 +5,7 @@ set -euo pipefail
 # Initializes git submodules and ensures directory structure is ready
 # Run during container image build (called from Containerfile)
 
-REPO_DIR="/home/sandbox/opencode-config"
+REPO_DIR="/home/sandbox/oc-sandbox"
 
 echo "=== opencode-sandbox bootstrap ==="
 
@@ -29,7 +29,7 @@ if [ ! -f "profiles/dev/plugins/superpowers.js" ]; then
 fi
 
 # Agent placeholder replacement
-AGENTS_DIR="/home/sandbox/opencode-config/profiles/dev/agents"
+AGENTS_DIR="/home/sandbox/oc-sandbox/profiles/dev/agents"
 
 echo "Configuring agent models..."
 for agent_file in "$AGENTS_DIR"/*.md; do

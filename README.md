@@ -7,7 +7,7 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 1. **Clone** the repository and install oc-sandbox:
 
    ```bash
-   git clone git@github.com:MarekBleschke/opencode-config.git && cd opencode-config
+   git clone git@github.com:MarekBleschke/oc-sandbox.git && cd oc-sandbox
    git submodule update --init --recursive
    ./sandbox/oc-sandbox install
    ```

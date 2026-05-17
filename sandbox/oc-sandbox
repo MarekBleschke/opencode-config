@@ -448,7 +448,7 @@ check_podman() {
 list_profiles() {
   local image_name="$1"
   local profiles
-  profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+  profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/oc-sandbox/profiles/ 2>/dev/null | grep -v '^\.' || true)
   if [ -z "$profiles" ]; then
     echo "  (no profiles found)"
   else
@@ -466,7 +466,7 @@ _refresh_profiles_for_tag() {
 
   if podman image exists "$image_name" 2>/dev/null; then
     local profiles
-    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/oc-sandbox/profiles/ 2>/dev/null | grep -v '^\.' || true)
     echo "$profiles" >"$cache_dir/profiles-${tag_name}"
     echo "profiles-${tag_name}_timestamp=${now}" >>"$cache_dir/cache.meta"
   fi
@@ -817,7 +817,7 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
   fi
 
   # Validate profile exists in the container image
-  if ! podman run --rm "$image_name" test -d "/home/sandbox/opencode-config/profiles/$profile" 2>/dev/null; then
+  if ! podman run --rm "$image_name" test -d "/home/sandbox/oc-sandbox/profiles/$profile" 2>/dev/null; then
     echo -e "${RED}Error: Invalid profile: '$profile'${NC}" >&2
     echo "" >&2
     echo "Available profiles:" >&2
@@ -961,7 +961,7 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     ${ssh_mounts[@]+"${ssh_mounts[@]}"} \
     ${auth_mount[@]+"${auth_mount[@]}"} \
     ${gh_token_env[@]+"${gh_token_env[@]}"} \
-    --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${profile}" \
+    --env "OPENCODE_CONFIG_DIR=/home/sandbox/oc-sandbox/profiles/${profile}" \
     "$image_name" \
     "$container_cmd"
 }
