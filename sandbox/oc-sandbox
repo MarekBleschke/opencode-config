@@ -458,16 +458,31 @@ _read_config_value() {
   return 0
 }
 
-# Expand a leading ~/ to $HOME/ in a path
+# Expand leading ~, ~/, $HOME, $HOME/, ${HOME}, ${HOME}/ in a path
 # Usage: _expand_home <path>
-# Only expands leading ~/ or bare ~, not ~ in the middle of a path
 _expand_home() {
   local path="$1"
+  # Expand ~/ or ~
   case "$path" in
-    "~/"*) echo "${HOME}/${path#~/}" ;;
-    "~") echo "$HOME" ;;
-    *) echo "$path" ;;
+    "~/"*) path="${HOME}/${path#"~/"}" ;;
+    "~") path="$HOME" ;;
   esac
+  # Expand $HOME, ${HOME}, $HOME/, ${HOME}/ — literal string matching
+  case "$path" in
+    \$HOME/*)
+      path="${HOME}/${path#\$HOME/}"
+      ;;
+    \$HOME)
+      path="$HOME"
+      ;;
+    \$\{HOME\}/*)
+      path="${HOME}/${path#\$\{HOME\}/}"
+      ;;
+    \$\{HOME\})
+      path="$HOME"
+      ;;
+  esac
+  echo "$path"
 }
 
 # Read a mount config value and return "src|dst" or empty string
