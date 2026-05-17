@@ -20,7 +20,6 @@ OPENCODE_INSTALL_SHA256_FILE="${SCRIPT_DIR}/opencode-install.sha256"
 COMPLETION_ZSH="${SCRIPT_DIR}/completion_zsh"
 IMAGE_BASE="localhost/opencode-sandbox"
 DEFAULT_TAG="main"
-DEFAULT_PROFILE="dev"
 
 # Terminal colors
 RED='\033[0;31m'
@@ -44,7 +43,7 @@ Run 'oc-sandbox <command> --help' for more information on a command.
 Examples:
     oc-sandbox build                        # Build image with default tag "main"
     oc-sandbox build --tag experiment       # Build image tagged "experiment"
-    oc-sandbox run                           # Run with defaults (tag: main, profile: dev, path: .)
+    oc-sandbox run                           # Run with defaults (tag: main, profile: from config, path: .)
     oc-sandbox run --profile web-dev         # Use web-dev profile
     oc-sandbox run -p systems ~/projects/x   # Use systems profile, specific project dir
 EOF
@@ -71,7 +70,7 @@ Run opencode in a containerized sandbox with filesystem isolation.
 
 Options:
     -t, --tag <TAG>            Tag of the image to run (default: main)
-    -p, --profile <NAME>      Opencode profile to activate (default: dev)
+    -p, --profile <NAME>      Opencode profile to activate (default: from config)
     --no-ssh                  Skip mounting SSH keys from host
     --no-auth                 Skip mounting auth.json from host
     --no-gh-token             Skip GH_TOKEN detection from host
@@ -83,7 +82,7 @@ Arguments:
     PATH   Directory to mount as /workspace (default: current working directory)
 
 Examples:
-    oc-sandbox run                           # Run with defaults
+    oc-sandbox run                           # Run with defaults (tag: main, profile: from config, path: .)
     oc-sandbox run --profile web-dev         # Use web-dev profile
     oc-sandbox run -p systems ~/projects/x   # Use systems profile, specific project dir
     oc-sandbox run --tag experiment          # Run the "experiment" tagged image
@@ -707,7 +706,7 @@ cmd_build() {
 # Run subcommand
 cmd_run() {
   local tag="$DEFAULT_TAG"
-  local profile="$DEFAULT_PROFILE"
+  local profile=""
   local workspace_path=""
   local no_ssh="false"
   local no_auth="false"
@@ -774,6 +773,21 @@ cmd_run() {
   # Validate --no-gh-token / --gh-token conflict
   if [ "$no_gh_token" = "true" ] && [ -n "$gh_token" ]; then
     error "Cannot use --gh-token with --no-gh-token"
+  fi
+
+  # If no profile from --profile flag, try config default
+  if [ -z "$profile" ]; then
+    local config_file="${HOME}/.config/oc-sandbox/config"
+    if [ -f "$config_file" ]; then
+      profile="$(_read_config_value "$config_file" "general" "default_profile")"
+    fi
+    if [ -z "$profile" ]; then
+      error "No default profile configured and --profile not specified.
+Set a default profile in ${config_file:-~/.config/oc-sandbox/config}:
+  [general]
+  default_profile = base
+Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
+    fi
   fi
 
   check_podman
