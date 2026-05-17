@@ -7,7 +7,7 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 1. **Clone** the repository and install oc-sandbox:
 
    ```bash
-   git clone git@github.com:MarekBleschke/opencode-config.git && cd opencode-config
+   git clone git@github.com:MarekBleschke/oc-sandbox.git && cd oc-sandbox
    git submodule update --init --recursive
    ./sandbox/oc-sandbox install
    ```
@@ -34,17 +34,30 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 
    | Flag | Default | Description |
    |------|---------|-------------|
-   | `-p, --profile <name>` | `dev` | Opencode profile to activate |
+   | `-p, --profile <name>` | `superpowers` | Opencode profile to activate |
    | `-t, --tag <tag>` | `main` | Image tag to run |
    | `--debug` | — | Drop into `/bin/bash` instead of opencode |
    | `--no-ssh` | — | Skip mounting SSH keys from host |
+   | `--no-auth` | — | Skip mounting auth.json from host |
 
-   Install as a global command:
+## Configuration
 
-   ```bash
-   oc-sandbox install       # adds symlink to ~/.local/bin/ + shell completions
-   oc-sandbox uninstall     # removes it
-   ```
+The config file at `~/.config/oc-sandbox/config` controls defaults:
+
+```ini
+[general]
+default_profile = superpowers
+
+[profile.superpowers]
+brainstorm = opencode-go/glm-5.1
+# ... other agent models
+
+[mounts]
+ssh_key = ~/.ssh/id_rsa|/home/sandbox/.ssh/id_rsa
+auth_json = ~/.local/share/opencode/auth.json|/home/sandbox/.local/share/opencode/auth.json
+```
+
+The `[mounts]` section uses `src_path|container_dst_path` pairs with `~/` expansion. If a mount key is missing or malformed, the CLI falls back to the default paths. Use `--no-ssh` or `--no-auth` to skip mounts regardless of config.
 
 ## Project structure
 
@@ -56,7 +69,7 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 │   ├── bootstrap.sh          # Initializes submodules during image build
 │   └── opencode-install.sha256
 ├── profiles/                 # Opencode configuration profiles
-│   └── dev/                  # Default profile (agents, skills, plugins, commands)
+│   └── superpowers/          # Default profile (agents, skills, plugins, commands)
 ├── docs/specs/               # Design documents
 └── submodules/               # Git submodules (e.g. superpowers)
 ```
@@ -64,6 +77,6 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 ## Adding a new profile
 
 1. Create a directory under `profiles/<name>/` with at minimum an `opencode.json` config file.
-2. Reference any submodules or shared resources via symlinks (see `profiles/dev/` for the pattern).
+2. Reference any submodules or shared resources via symlinks (see `profiles/superpowers/` for the pattern).
 3. Rebuild the image: `oc-sandbox build --force`
 4. Run with the new profile: `oc-sandbox run --profile <name>`

@@ -1,6 +1,6 @@
 ---
 description: "Design and spec agent for creative work before implementation. Design/spec work only. No implementation."
-model: {{MODEL_DEV_BRAINSTORM}}
+model: {{MODEL_SUPERPOWERS_BRAINSTORM}}
 mode: primary
 temperature: 0.6
 color: accent

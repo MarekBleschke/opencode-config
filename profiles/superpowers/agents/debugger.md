@@ -1,6 +1,6 @@
 ---
 description: "Root-cause investigation agent for bugs, test failures, and unexpected behavior. Investigation and fixes. Root-cause first."
-model: {{MODEL_DEV_DEBUGGER}}
+model: {{MODEL_SUPERPOWERS_DEBUGGER}}
 mode: primary
 temperature: 0.3
 color: warning

@@ -1,6 +1,6 @@
 ---
 description: "Code quality reviewer for bugs, regressions, test gaps, and maintainability. Read-only review. No edits."
-model: {{MODEL_DEV_CODE_REVIEWER}}
+model: {{MODEL_SUPERPOWERS_CODE_REVIEWER}}
 mode: subagent
 hidden: true
 temperature: 0.2

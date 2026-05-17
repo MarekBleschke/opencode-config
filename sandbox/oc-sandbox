@@ -252,6 +252,22 @@ cmd_install() {
     fi
   fi
 
+  # Pre-fill [mounts] section on first config creation
+  if [ "$config_created" = "true" ] && [ -f "$config_file" ]; then
+    # Check if [mounts] section already exists (it shouldn't on first creation from template)
+    if ! grep -q '^\[mounts\]' "$config_file" 2>/dev/null; then
+      cat >> "$config_file" <<'MOUNTS_EOF'
+
+[mounts]
+# Host paths mounted into the sandbox container: src_path|container_dst_path
+# Use ~/ for home directory references (expanded at runtime)
+ssh_key = ~/.ssh/id_rsa|/home/sandbox/.ssh/id_rsa
+auth_json = ~/.local/share/opencode/auth.json|/home/sandbox/.local/share/opencode/auth.json
+MOUNTS_EOF
+      info "Pre-filled [mounts] section with default paths"
+    fi
+  fi
+
   info "Config file location: ${config_file}"
   info "Customize agent models and git identity there."
 
@@ -402,6 +418,10 @@ _read_config_value() {
   local file="$1"
   local section="$2"
   local key="$3"
+
+  # Gracefully handle missing config file — callers use empty return to fall back
+  [ -f "$file" ] || return 0
+
   local in_section="false"
   local line trimmed key_part value_part
 
@@ -438,6 +458,42 @@ _read_config_value() {
   return 0
 }
 
+# Expand leading ~, ~/, $HOME, $HOME/, ${HOME}, ${HOME}/ in a path
+# Usage: _expand_home <path>
+_expand_home() {
+  local path="$1"
+  # Expand ~/ or ~
+  case "$path" in
+    "~/"*) path="${HOME}/${path#"~/"}" ;;
+    "~") path="$HOME" ;;
+  esac
+  # Expand $HOME, ${HOME}, $HOME/, ${HOME}/ — literal string matching
+  case "$path" in
+    \$HOME/*)
+      path="${HOME}/${path#\$HOME/}"
+      ;;
+    \$HOME)
+      path="$HOME"
+      ;;
+    \$\{HOME\}/*)
+      path="${HOME}/${path#\$\{HOME\}/}"
+      ;;
+    \$\{HOME\})
+      path="$HOME"
+      ;;
+  esac
+  echo "$path"
+}
+
+# Read a mount config value and return "src|dst" or empty string
+# Usage: _read_mount_config <config_file> <key>
+# Returns the raw value from [mounts] section, or empty if not found
+_read_mount_config() {
+  local file="$1"
+  local key="$2"
+  _read_config_value "$file" "mounts" "$key"
+}
+
 check_podman() {
   if ! command -v podman &>/dev/null; then
     error "podman not found. Please install podman."
@@ -448,7 +504,7 @@ check_podman() {
 list_profiles() {
   local image_name="$1"
   local profiles
-  profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+  profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/oc-sandbox/profiles/ 2>/dev/null | grep -v '^\.' || true)
   if [ -z "$profiles" ]; then
     echo "  (no profiles found)"
   else
@@ -466,7 +522,7 @@ _refresh_profiles_for_tag() {
 
   if podman image exists "$image_name" 2>/dev/null; then
     local profiles
-    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/opencode-config/profiles/ 2>/dev/null | grep -v '^\.' || true)
+    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/oc-sandbox/profiles/ 2>/dev/null | grep -v '^\.' || true)
     echo "$profiles" >"$cache_dir/profiles-${tag_name}"
     echo "profiles-${tag_name}_timestamp=${now}" >>"$cache_dir/cache.meta"
   fi
@@ -661,7 +717,7 @@ cmd_build() {
   fi
   build_args+=("--build-arg" "GITIGNORE_CONTENT=${gitignore_content}")
 
-  # Add model build args from [profile.dev]
+  # Add model build args from [profile.superpowers]
   local agent_name model_value arg_name
   local agents=(
     "brainstorm"
@@ -676,8 +732,8 @@ cmd_build() {
   )
 
   for agent_name in "${agents[@]}"; do
-    model_value="$(_read_config_value "$config_file" "profile.dev" "$agent_name")"
-    arg_name="MODEL_DEV_$(echo "$agent_name" | tr 'a-z-' 'A-Z_')"
+    model_value="$(_read_config_value "$config_file" "profile.superpowers" "$agent_name")"
+    arg_name="MODEL_SUPERPOWERS_$(echo "$agent_name" | tr 'a-z-' 'A-Z_')"
     build_args+=("--build-arg" "${arg_name}=${model_value}")
   done
 
@@ -775,9 +831,11 @@ cmd_run() {
     error "Cannot use --gh-token with --no-gh-token"
   fi
 
+  # Config file path (needed for profile resolution and mount config)
+  local config_file="${HOME}/.config/oc-sandbox/config"
+
   # If no profile from --profile flag, try config default
   if [ -z "$profile" ]; then
-    local config_file="${HOME}/.config/oc-sandbox/config"
     if [ -f "$config_file" ]; then
       profile="$(_read_config_value "$config_file" "general" "default_profile")"
     fi
@@ -817,7 +875,7 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
   fi
 
   # Validate profile exists in the container image
-  if ! podman run --rm "$image_name" test -d "/home/sandbox/opencode-config/profiles/$profile" 2>/dev/null; then
+  if ! podman run --rm "$image_name" test -d "/home/sandbox/oc-sandbox/profiles/$profile" 2>/dev/null; then
     echo -e "${RED}Error: Invalid profile: '$profile'${NC}" >&2
     echo "" >&2
     echo "Available profiles:" >&2
@@ -859,45 +917,88 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     fi
   fi
 
-  # SSH key auto-detection
+  # SSH key auto-detection (configurable via [mounts] section)
   local ssh_mounts=()
-  local ssh_key="${HOME}/.ssh/id_rsa"
-  local ssh_pub_key="${HOME}/.ssh/id_rsa.pub"
 
   if [ "$no_ssh" = "true" ]; then
     info "Skipping SSH key mount (--no-ssh)"
-  elif [ -e "$ssh_key" ]; then
-    if [ ! -r "$ssh_key" ]; then
-      error "Cannot read SSH key at ~/.ssh/id_rsa. Check file permissions."
-    fi
-    # Permission check (GNU stat uses -c, BSD/macOS stat uses -f)
-    local mode
-    mode=$(stat -c '%a' "$ssh_key" 2>/dev/null || stat -f '%Lp' "$ssh_key" 2>/dev/null)
-    if [ -n "$mode" ] && [ $((0$mode & 077)) -ne 0 ]; then
-      warn "SSH key at ~/.ssh/id_rsa has overly permissive permissions (0${mode})."
-      warn "SSH may refuse to use it. Consider: chmod 600 ~/.ssh/id_rsa"
-    fi
-    ssh_mounts+=("--mount" "type=bind,src=${ssh_key},dst=/home/sandbox/.ssh/id_rsa,readonly,relabel=private")
-    if [ -e "$ssh_pub_key" ]; then
-      ssh_mounts+=("--mount" "type=bind,src=${ssh_pub_key},dst=/home/sandbox/.ssh/id_rsa.pub,readonly,relabel=private")
-    fi
   else
-    warn "SSH key not found at ~/.ssh/id_rsa. Git SSH operations may not work."
+    # Read mount config or fall back to defaults
+    local ssh_mount_value
+    ssh_mount_value="$(_read_mount_config "$config_file" "ssh_key")"
+    local ssh_key=""
+    local ssh_dst=""
+
+    if [ -n "$ssh_mount_value" ] && [[ "$ssh_mount_value" == *"|"* ]]; then
+      local ssh_src_raw
+      ssh_src_raw="$(echo "${ssh_mount_value%%|*}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      ssh_dst="$(echo "${ssh_mount_value#*|}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      ssh_key="$(_expand_home "$ssh_src_raw")"
+    fi
+
+    # If config didn't provide valid values, fall back to defaults
+    if [ -z "$ssh_key" ] || [ -z "$ssh_dst" ]; then
+      ssh_key="${HOME}/.ssh/id_rsa"
+      ssh_dst="/home/sandbox/.ssh/id_rsa"
+    fi
+
+    local ssh_pub_key="${ssh_key}.pub"
+
+    if [ -e "$ssh_key" ]; then
+      if [ ! -r "$ssh_key" ]; then
+        error "Cannot read SSH key at ${ssh_key}. Check file permissions."
+      fi
+      # Permission check (GNU stat uses -c, BSD/macOS stat uses -f)
+      local mode
+      mode=$(stat -c '%a' "$ssh_key" 2>/dev/null || stat -f '%Lp' "$ssh_key" 2>/dev/null)
+      if [ -n "$mode" ] && [ $((0$mode & 077)) -ne 0 ]; then
+        warn "SSH key at ${ssh_key} has overly permissive permissions (0${mode})."
+        warn "SSH may refuse to use it. Consider: chmod 600 ${ssh_key}"
+      fi
+      ssh_mounts+=("--mount" "type=bind,src=${ssh_key},dst=${ssh_dst},readonly,relabel=private")
+      if [ -e "$ssh_pub_key" ]; then
+        # Public key always goes to the same basename with .pub extension
+        local pub_dst="${ssh_dst}.pub"
+        ssh_mounts+=("--mount" "type=bind,src=${ssh_pub_key},dst=${pub_dst},readonly,relabel=private")
+      fi
+    else
+      warn "SSH key not found at ${ssh_key}. Git SSH operations may not work."
+    fi
   fi
 
-  # auth.json auto-detection
+  # auth.json auto-detection (configurable via [mounts] section)
   local auth_mount=()
-  local auth_json="${HOME}/.local/share/opencode/auth.json"
 
   if [ "$no_auth" = "true" ]; then
     info "Skipping auth.json mount (--no-auth)"
-  elif [ -e "$auth_json" ]; then
-    if [ ! -r "$auth_json" ]; then
-      error "Cannot read auth.json at ~/.local/share/opencode/auth.json. Check file permissions."
-    fi
-    auth_mount+=("--mount" "type=bind,src=${auth_json},dst=/home/sandbox/.local/share/opencode/auth.json,readonly,relabel=private")
   else
-    warn "auth.json not found at ~/.local/share/opencode/auth.json. Authenticated providers may not work."
+    # Read mount config or fall back to defaults
+    local auth_mount_value
+    auth_mount_value="$(_read_mount_config "$config_file" "auth_json")"
+    local auth_src=""
+    local auth_dst=""
+
+    if [ -n "$auth_mount_value" ] && [[ "$auth_mount_value" == *"|"* ]]; then
+      local auth_src_raw
+      auth_src_raw="$(echo "${auth_mount_value%%|*}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      auth_dst="$(echo "${auth_mount_value#*|}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      auth_src="$(_expand_home "$auth_src_raw")"
+    fi
+
+    # If config didn't provide valid values, fall back to defaults
+    if [ -z "$auth_src" ] || [ -z "$auth_dst" ]; then
+      auth_src="${HOME}/.local/share/opencode/auth.json"
+      auth_dst="/home/sandbox/.local/share/opencode/auth.json"
+    fi
+
+    if [ -e "$auth_src" ]; then
+      if [ ! -r "$auth_src" ]; then
+        error "Cannot read auth.json at ${auth_src}. Check file permissions."
+      fi
+      auth_mount+=("--mount" "type=bind,src=${auth_src},dst=${auth_dst},readonly,relabel=private")
+    else
+      warn "auth.json not found at ${auth_src}. Authenticated providers may not work."
+    fi
   fi
 
   # GH_TOKEN auto-detection
@@ -961,7 +1062,7 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     ${ssh_mounts[@]+"${ssh_mounts[@]}"} \
     ${auth_mount[@]+"${auth_mount[@]}"} \
     ${gh_token_env[@]+"${gh_token_env[@]}"} \
-    --env "OPENCODE_CONFIG_DIR=/home/sandbox/opencode-config/profiles/${profile}" \
+    --env "OPENCODE_CONFIG_DIR=/home/sandbox/oc-sandbox/profiles/${profile}" \
     "$image_name" \
     "$container_cmd"
 }
