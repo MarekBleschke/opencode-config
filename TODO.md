@@ -12,3 +12,4 @@
   - no hardcoded profile names
   - no hardcoded agents paths, ARGs, ENVS etc.
   - proposition: instead of multiple ARGs in Containerfile, use a single ARG with JSON, BASE64 or create temporary file to copy to image during build. To discuss pros and cons.
+  - currently changing models in config doesn't work with rebuilding - ARGS from Containerfile are cached. Take into consideration fixing this issue when implementing this task.
