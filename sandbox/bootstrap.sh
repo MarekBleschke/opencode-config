@@ -21,15 +21,15 @@ if [ ! -d "profiles" ]; then
 fi
 
 echo "Verifying submodule symlinks..."
-# The dev profile uses symlinks that point into submodules
+# The superpowers profile uses symlinks that point into submodules
 # After submodule init, these should resolve
-if [ ! -f "profiles/dev/plugins/superpowers.js" ]; then
+if [ ! -f "profiles/superpowers/plugins/superpowers.js" ]; then
     echo "Error: superpowers plugin symlink not resolved (submodules may not be fully initialized)" >&2
     exit 1
 fi
 
 # Agent placeholder replacement
-AGENTS_DIR="/home/sandbox/oc-sandbox/profiles/dev/agents"
+AGENTS_DIR="/home/sandbox/oc-sandbox/profiles/superpowers/agents"
 
 echo "Configuring agent models..."
 for agent_file in "$AGENTS_DIR"/*.md; do
@@ -37,15 +37,15 @@ for agent_file in "$AGENTS_DIR"/*.md; do
 
   # Use sed with backup for macOS+Linux portability, then remove backup
   sed -i.bak \
-    -e "s|{{MODEL_DEV_BRAINSTORM}}|${MODEL_DEV_BRAINSTORM:-}|g" \
-    -e "s|{{MODEL_DEV_PLANNER}}|${MODEL_DEV_PLANNER:-}|g" \
-    -e "s|{{MODEL_DEV_DEBUGGER}}|${MODEL_DEV_DEBUGGER:-}|g" \
-    -e "s|{{MODEL_DEV_EXECUTION_ORCHESTRATOR}}|${MODEL_DEV_EXECUTION_ORCHESTRATOR:-}|g" \
-    -e "s|{{MODEL_DEV_SOFTWARE_ENGINEER}}|${MODEL_DEV_SOFTWARE_ENGINEER:-}|g" \
-    -e "s|{{MODEL_DEV_SENIOR_SOFTWARE_ENGINEER}}|${MODEL_DEV_SENIOR_SOFTWARE_ENGINEER:-}|g" \
-    -e "s|{{MODEL_DEV_CODE_REVIEWER}}|${MODEL_DEV_CODE_REVIEWER:-}|g" \
-    -e "s|{{MODEL_DEV_SPEC_REVIEWER}}|${MODEL_DEV_SPEC_REVIEWER:-}|g" \
-    -e "s|{{MODEL_DEV_UTILITY}}|${MODEL_DEV_UTILITY:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_BRAINSTORM}}|${MODEL_SUPERPOWERS_BRAINSTORM:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_PLANNER}}|${MODEL_SUPERPOWERS_PLANNER:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_DEBUGGER}}|${MODEL_SUPERPOWERS_DEBUGGER:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_EXECUTION_ORCHESTRATOR}}|${MODEL_SUPERPOWERS_EXECUTION_ORCHESTRATOR:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_SOFTWARE_ENGINEER}}|${MODEL_SUPERPOWERS_SOFTWARE_ENGINEER:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_SENIOR_SOFTWARE_ENGINEER}}|${MODEL_SUPERPOWERS_SENIOR_SOFTWARE_ENGINEER:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_CODE_REVIEWER}}|${MODEL_SUPERPOWERS_CODE_REVIEWER:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_SPEC_REVIEWER}}|${MODEL_SUPERPOWERS_SPEC_REVIEWER:-}|g" \
+    -e "s|{{MODEL_SUPERPOWERS_UTILITY}}|${MODEL_SUPERPOWERS_UTILITY:-}|g" \
     "$agent_file"
   rm -f "$agent_file.bak"
 done

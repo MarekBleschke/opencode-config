@@ -1,6 +1,6 @@
 ---
 description: "Spec compliance reviewer for checking implementation against plan/spec conformance. Read-only review. No edits."
-model: {{MODEL_DEV_SPEC_REVIEWER}}
+model: {{MODEL_SUPERPOWERS_SPEC_REVIEWER}}
 mode: subagent
 hidden: true
 temperature: 0.2

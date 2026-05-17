@@ -1,6 +1,6 @@
 ---
 description: "Planning agent for converting specs into precise implementation plans. Plan creation only. No execution."
-model: {{MODEL_DEV_PLANNER}}
+model: {{MODEL_SUPERPOWERS_PLANNER}}
 mode: primary
 temperature: 0.3
 color: secondary

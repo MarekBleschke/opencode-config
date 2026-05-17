@@ -661,7 +661,7 @@ cmd_build() {
   fi
   build_args+=("--build-arg" "GITIGNORE_CONTENT=${gitignore_content}")
 
-  # Add model build args from [profile.dev]
+  # Add model build args from [profile.superpowers]
   local agent_name model_value arg_name
   local agents=(
     "brainstorm"
@@ -676,8 +676,8 @@ cmd_build() {
   )
 
   for agent_name in "${agents[@]}"; do
-    model_value="$(_read_config_value "$config_file" "profile.dev" "$agent_name")"
-    arg_name="MODEL_DEV_$(echo "$agent_name" | tr 'a-z-' 'A-Z_')"
+    model_value="$(_read_config_value "$config_file" "profile.superpowers" "$agent_name")"
+    arg_name="MODEL_SUPERPOWERS_$(echo "$agent_name" | tr 'a-z-' 'A-Z_')"
     build_args+=("--build-arg" "${arg_name}=${model_value}")
   done
 

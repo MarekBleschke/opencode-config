@@ -1,6 +1,6 @@
 ---
 description: "Plan execution orchestrator. Dispatches implementers and reviewers per task. Delegation only — no coding."
-model: {{MODEL_DEV_EXECUTION_ORCHESTRATOR}}
+model: {{MODEL_SUPERPOWERS_EXECUTION_ORCHESTRATOR}}
 mode: primary
 temperature: 0.2
 color: warning

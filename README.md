@@ -34,7 +34,7 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 
    | Flag | Default | Description |
    |------|---------|-------------|
-   | `-p, --profile <name>` | `dev` | Opencode profile to activate |
+   | `-p, --profile <name>` | `superpowers` | Opencode profile to activate |
    | `-t, --tag <tag>` | `main` | Image tag to run |
    | `--debug` | — | Drop into `/bin/bash` instead of opencode |
    | `--no-ssh` | — | Skip mounting SSH keys from host |
@@ -56,7 +56,7 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 │   ├── bootstrap.sh          # Initializes submodules during image build
 │   └── opencode-install.sha256
 ├── profiles/                 # Opencode configuration profiles
-│   └── dev/                  # Default profile (agents, skills, plugins, commands)
+│   └── superpowers/          # Default profile (agents, skills, plugins, commands)
 ├── docs/specs/               # Design documents
 └── submodules/               # Git submodules (e.g. superpowers)
 ```
@@ -64,6 +64,6 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 ## Adding a new profile
 
 1. Create a directory under `profiles/<name>/` with at minimum an `opencode.json` config file.
-2. Reference any submodules or shared resources via symlinks (see `profiles/dev/` for the pattern).
+2. Reference any submodules or shared resources via symlinks (see `profiles/superpowers/` for the pattern).
 3. Rebuild the image: `oc-sandbox build --force`
 4. Run with the new profile: `oc-sandbox run --profile <name>`

@@ -18,7 +18,7 @@ sandbox/test-sandbox.sh    # Integration tests (require podman — cannot run in
 sandbox/opencode-install.sha256  # SHA256 checksum for opencode install script
 sandbox/completion_zsh     # Zsh completion definitions
 profiles/                  # Opencode config directories, one per profile
-  dev/                     # Default profile
+  superpowers/               # Default profile
     opencode.json          # Opencode configuration
     agents/                # Agent definitions (markdown)
     commands/              # Command definitions (markdown)
@@ -31,7 +31,7 @@ docs/specs/, docs/plans/   # Design documents (gitignored)
 
 ### profiles/
 
-Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run -p <name>`. Profiles wire together skills, agents, commands, and plugins from submodules via symlinks. The `dev` profile is the default. New profiles can be added under `profiles/<name>/` with at minimum an `opencode.json`.
+Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run -p <name>`. Profiles wire together skills, agents, commands, and plugins from submodules via symlinks. The `superpowers` profile is the default. New profiles can be added under `profiles/<name>/` with at minimum an `opencode.json`.
 
 ## Testing
 
@@ -88,7 +88,7 @@ All bash scripts must run correctly on both macOS (BSD userland) and Linux (GNU 
 
 The `sandbox/bootstrap.sh` script is the designated place for all build-time customization logic. This includes:
 
-- **Placeholder replacement** in profile agent files (e.g., replacing `{{MODEL_DEV_*}}` placeholders with values from the build configuration)
+- **Placeholder replacement** in profile agent files (e.g., replacing `{{MODEL_SUPERPOWERS_*}}` placeholders with values from the build configuration)
 - **File generation from build arguments** (e.g., writing `.gitconfig` and `.gitignore` from `GIT_USER_NAME`, `GIT_USER_EMAIL`, and `GITIGNORE_CONTENT` build args)
 
 When adding new build-time behavior:

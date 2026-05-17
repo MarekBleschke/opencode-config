@@ -1,6 +1,6 @@
 ---
 description: "Implementation agent for complex, architectural coding tasks. Multi-file coordination, design decisions, large refactors. Code execution only. Stay in provided scope."
-model: {{MODEL_DEV_SENIOR_SOFTWARE_ENGINEER}}
+model: {{MODEL_SUPERPOWERS_SENIOR_SOFTWARE_ENGINEER}}
 mode: subagent
 hidden: true
 temperature: 0.2
