@@ -59,13 +59,6 @@ auth_json = ~/.local/share/opencode/auth.json|/home/sandbox/.local/share/opencod
 
 The `[mounts]` section uses `src_path|container_dst_path` pairs with `~/` expansion. If a mount key is missing or malformed, the CLI falls back to the default paths. Use `--no-ssh` or `--no-auth` to skip mounts regardless of config.
 
-   Install as a global command:
-
-   ```bash
-   oc-sandbox install       # adds symlink to ~/.local/bin/ + shell completions
-   oc-sandbox uninstall     # removes it
-   ```
-
 ## Project structure
 
 ```
