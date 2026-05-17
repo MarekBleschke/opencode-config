@@ -38,6 +38,26 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
    | `-t, --tag <tag>` | `main` | Image tag to run |
    | `--debug` | — | Drop into `/bin/bash` instead of opencode |
    | `--no-ssh` | — | Skip mounting SSH keys from host |
+   | `--no-auth` | — | Skip mounting auth.json from host |
+
+## Configuration
+
+The config file at `~/.config/oc-sandbox/config` controls defaults:
+
+```ini
+[general]
+default_profile = superpowers
+
+[profile.superpowers]
+brainstorm = opencode-go/glm-5.1
+# ... other agent models
+
+[mounts]
+ssh_key = ~/.ssh/id_rsa|/home/sandbox/.ssh/id_rsa
+auth_json = ~/.local/share/opencode/auth.json|/home/sandbox/.local/share/opencode/auth.json
+```
+
+The `[mounts]` section uses `src_path|container_dst_path` pairs with `~/` expansion. If a mount key is missing or malformed, the CLI falls back to the default paths. Use `--no-ssh` or `--no-auth` to skip mounts regardless of config.
 
    Install as a global command:
 
