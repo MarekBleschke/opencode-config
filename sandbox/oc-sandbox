@@ -20,7 +20,6 @@ OPENCODE_INSTALL_SHA256_FILE="${SCRIPT_DIR}/opencode-install.sha256"
 COMPLETION_ZSH="${SCRIPT_DIR}/completion_zsh"
 IMAGE_BASE="localhost/opencode-sandbox"
 DEFAULT_TAG="main"
-DEFAULT_PROFILE="dev"
 
 # Terminal colors
 RED='\033[0;31m'
@@ -707,7 +706,7 @@ cmd_build() {
 # Run subcommand
 cmd_run() {
   local tag="$DEFAULT_TAG"
-  local profile="$DEFAULT_PROFILE"
+  local profile=""
   local workspace_path=""
   local no_ssh="false"
   local no_auth="false"
