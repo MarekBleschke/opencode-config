@@ -3,18 +3,17 @@
   "permission": {
     "bash": {
       "gh *": "ask",
-      "gh pr *": "allow",
+      "gh pr *": "allow"
     },
     "external_directory": {
       "*": "ask",
-      "/home/sandbox/oc-sandbox/submodules/*": "allow",
       "/tmp": "allow",
       "/tmp/*": "allow",
       "/private/tmp": "allow",
       "/private/tmp/*": "allow",
       "env:$TMPDIR": "allow",
       "env:$TMPDIR/*": "allow"
-    },
+    }
   },
   "watcher": {
     "ignore": [
@@ -23,7 +22,7 @@
       "dist/**",
       "build/**",
       ".next/**",
-      "coverage/**",
+      "coverage/**"
     ]
   }
 }
