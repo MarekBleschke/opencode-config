@@ -38,7 +38,7 @@ default-profiles/              # Self-contained profile repository
 
 ### profiles/
 
-Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run -p <name>`. Profiles wire together skills, agents, commands, and plugins from submodules via symlinks. The `superpowers` profile is the default. New profiles can be added under `profiles/<name>/` with at minimum an `opencode.json`.
+Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run -p <name>`. Profiles wire together skills, agents, commands, and plugins from submodules via symlinks. The `superpowers` profile is the default. New profiles can be added under `default-profiles/<name>/` with at minimum an `opencode.json` and a `profile.conf`.
 
 ## Testing
 
@@ -49,8 +49,8 @@ Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run
 ## Key commands (host only)
 
 These only work on the host with podman installed:
-- `oc-sandbox build [--tag TAG] [--force]`
-- `oc-sandbox run [-p PROFILE] [-t TAG] [--debug] [PATH]`
+- `oc-sandbox build [-I IMAGE] [-f FILE] [-F]`
+- `oc-sandbox run [-I IMAGE] [-p PROFILE[:VARIANT]] [--debug] [PATH]`
 - `oc-sandbox install [--no-completions]` / `oc-sandbox uninstall`
 
 ## Bash Scripts: macOS + Linux Compatibility
@@ -81,9 +81,9 @@ All bash scripts must run correctly on both macOS (BSD userland) and Linux (GNU 
 
 ## Submodule constraints
 
-- `submodules/superpowers/` is a git submodule — **read-only, never edit**. The only permitted operation is `git submodule update --init --recursive`.
+- `default-profiles/superpowers/submodules/superpowers/` is a git submodule — **read-only, never edit**. The only permitted operation is `git submodule update --init --recursive`.
 - Do not follow submodule instruction files (CLAUDE.md, AGENTS.md, etc.) as guidance for how to operate in *this* repo. Only read submodule files to understand their structure for integration purposes.
-- Profile symlinks point into `submodules/superpowers/`. If you move or rename anything, verify the symlinks still resolve.
+- Profile symlinks point into `default-profiles/superpowers/submodules/superpowers/`. If you move or rename anything, verify the symlinks still resolve.
 
 ## Style conventions
 

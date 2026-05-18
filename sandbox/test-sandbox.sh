@@ -251,7 +251,7 @@ echo ""
 echo "--- Test 10: Run with invalid profile (path traversal) ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$("$OC_SANDBOX" run --profile "invalid/profile" 2>&1)
     EXIT_CODE=$?
@@ -275,7 +275,7 @@ echo ""
 echo "--- Test 11: Run with nonexistent path ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$("$OC_SANDBOX" run /nonexistent/path/xyz 2>&1)
     EXIT_CODE=$?
@@ -299,7 +299,7 @@ echo ""
 echo "--- Test 12: Run with non-directory path ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     NOT_DIR="${TEST_DIR}/not_a_dir"
     touch "$NOT_DIR"
@@ -325,7 +325,7 @@ echo ""
 echo "--- Test 13: Outside home directory warning (non-interactive) ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     # Pipe 'n' to simulate non-interactive stdin rejecting the prompt
     OUTPUT=$(echo "n" | "$OC_SANDBOX" run /tmp 2>&1)
@@ -350,12 +350,12 @@ echo ""
 echo "--- Test 14: Filesystem isolation ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     # Test writing to / (should fail)
     OUTPUT=$(podman run --rm --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -373,7 +373,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Test writing to /workspace (should succeed)
     OUTPUT=$(podman run --rm --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -391,7 +391,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Test writing to /tmp (should succeed)
     OUTPUT=$(podman run --rm --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -409,7 +409,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     # Test writing to /home/sandbox (should succeed)
     OUTPUT=$(podman run --rm --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -437,13 +437,13 @@ echo ""
 echo "--- Test 15: Permission escalation prevention ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     # Test that container runs as sandbox user
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -462,7 +462,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -490,9 +490,9 @@ echo ""
 echo "--- Test 16: Persistent home directory ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
-    VOLUME_NAME="oc-sandbox-home-main"
+    VOLUME_NAME="oc-sandbox-home-base"
 
     # Write a marker file into the home volume
     OUTPUT=$(podman run --rm \
@@ -545,12 +545,12 @@ echo ""
 echo "--- Test 17: GitHub SSH known_hosts ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -578,7 +578,7 @@ echo ""
 echo "--- Test 18: SSH key mount ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_18"
     mkdir -p "${TEMP_HOME}/.ssh"
@@ -588,7 +588,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -617,7 +617,7 @@ echo ""
 echo "--- Test 19: SSH key read-only ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_19"
     mkdir -p "${TEMP_HOME}/.ssh"
@@ -627,7 +627,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -656,7 +656,7 @@ echo ""
 echo "--- Test 20: SSH public key mount ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_20"
     mkdir -p "${TEMP_HOME}/.ssh"
@@ -667,7 +667,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -697,7 +697,7 @@ echo ""
 echo "--- Test 21: Auth.json mount ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_21"
     mkdir -p "${TEMP_HOME}/.local/share/opencode"
@@ -706,7 +706,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -735,7 +735,7 @@ echo ""
 echo "--- Test 22: Auth.json read-only ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_22"
     mkdir -p "${TEMP_HOME}/.local/share/opencode"
@@ -744,7 +744,7 @@ if [ "$PODMAN_AVAILABLE" = "true" ]; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -773,7 +773,7 @@ echo ""
 echo "--- Test 23: Missing SSH key warning ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_23"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -797,7 +797,7 @@ echo ""
 echo "--- Test 24: Missing auth.json warning ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_24"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -822,7 +822,7 @@ echo ""
 echo "--- Test 25: --no-ssh flag ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_25"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -849,7 +849,7 @@ echo ""
 echo "--- Test 26: --no-auth flag ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_26"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -876,7 +876,7 @@ echo ""
 echo "--- Test 27: Permissive SSH key warning ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_27"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -903,7 +903,7 @@ echo ""
 echo "--- Test 28: Unreadable SSH key error ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_28"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -936,12 +936,12 @@ echo ""
 echo "--- Test 29: Plugin warmup ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -969,12 +969,12 @@ echo ""
 echo "--- Test 30: Git SSH clone ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -1257,12 +1257,12 @@ echo ""
 echo "--- Test 44: GitHub CLI available ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$(podman run --rm \
       --read-only \
       --tmpfs /tmp:rw,noexec,nosuid,size=100m \
-      --volume "oc-sandbox-home-main:/home/sandbox" \
+      --volume "oc-sandbox-home-base:/home/sandbox" \
       --user sandbox \
       --cap-drop ALL \
       --cap-add CHOWN \
@@ -1301,7 +1301,7 @@ echo ""
 echo "--- Test 46: --debug runs bash ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_46"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -1327,7 +1327,7 @@ echo ""
 echo "--- Test 47: --no-gh-token flag ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_47"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -1349,7 +1349,7 @@ echo ""
 echo "--- Test 48: --gh-token flag ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_48"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -1375,7 +1375,7 @@ echo ""
 echo "--- Test 49: GH_TOKEN auto-detect warning ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_49"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -1398,7 +1398,7 @@ echo ""
 echo "--- Test 50: --debug + --no-gh-token ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     TEMP_HOME="${TEST_DIR}/temp_home_50"
     mkdir -p "${TEMP_HOME}/workspace"
@@ -1467,7 +1467,7 @@ assert_stdout_contains "$OUTPUT" "#compdef oc-sandbox" "Zsh output contains comp
 assert_stdout_contains "$OUTPUT" "_oc-sandbox()" "Zsh output contains main function"
 assert_stdout_contains "$OUTPUT" "_oc-sandbox_build" "Zsh output contains build completion"
 assert_stdout_contains "$OUTPUT" "_oc-sandbox_run" "Zsh output contains run completion"
-assert_stdout_contains "$OUTPUT" "_oc-sandbox_image_tags" "Zsh output contains image tag completion"
+assert_stdout_contains "$OUTPUT" "_oc-sandbox_images" "Zsh output contains image completion"
 assert_stdout_contains "$OUTPUT" "_oc-sandbox_profiles" "Zsh output contains profile completion"
 assert_stdout_contains "$OUTPUT" "compdef _oc-sandbox oc-sandbox" "Zsh output contains compdef registration"
 
@@ -1765,7 +1765,7 @@ echo ""
 echo "--- Test: Build with --image flag ---"
 
 if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  IMAGE_NAME="localhost/oc-sandbox:main"
+  IMAGE_NAME="localhost/oc-sandbox:base"
   if podman image exists "$IMAGE_NAME" 2>/dev/null; then
     OUTPUT=$("$OC_SANDBOX" build --image base --force 2>&1)
     EXIT_CODE=$?
