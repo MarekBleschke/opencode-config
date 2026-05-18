@@ -159,11 +159,17 @@ if [ -d "${PROFILE_DIR}/agents" ]; then
   fi
 fi
 
-# --- Symlink non-agent content ---
-for item in opencode.json skills plugins commands; do
-  if [ -e "${PROFILE_DIR}/${item}" ]; then
-    ln -s "${PROFILE_DIR}/${item}" "${RESOLVED_PATH}/${item}"
-  fi
+# --- Symlink everything from profile dir except agents/ ---
+# Agents are already copied and resolved above; all other items
+# (opencode.json, skills, plugins, commands, etc.) are symlinked directly
+for profile_item in "${PROFILE_DIR}"/*; do
+  item_name="$(basename "$profile_item")"
+  # Skip agents/ — already processed above
+  [ "$item_name" = "agents" ] && continue
+  # Skip profile config files — already consumed by init.sh above
+  [ "$item_name" = "profile.conf" ] && continue
+  [[ "$item_name" == profile.*.conf ]] && continue
+  ln -s "$profile_item" "${RESOLVED_PATH}/${item_name}"
 done
 
 # --- Launch opencode ---
