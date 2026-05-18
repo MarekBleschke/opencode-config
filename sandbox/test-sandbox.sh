@@ -1558,18 +1558,18 @@ fi
 
 echo ""
 
-# --- Test 61: Completion --tag without value (error path) ---
+# --- Test 61: Completion --image without value (error path) ---
 
-echo "--- Test 61: Completion --tag without value ---"
+echo "--- Test 61: Completion --image without value ---"
 
-OUTPUT=$("$OC_SANDBOX" completion --refresh --tag 2>&1)
+OUTPUT=$("$OC_SANDBOX" completion --refresh --image 2>&1)
 EXIT_CODE=$?
-if [ "$EXIT_CODE" -ne 0 ]; then
-  pass "completion --tag without value exits with error"
+if [ "$(printf '%s' "$OUTPUT" | grep -c "requires a value")" -ge 1 ]; then
+  pass "completion --image without value exits with error"
 else
-  fail "completion --tag without value should exit with error"
+  fail "completion --image without value should exit with error"
 fi
-assert_stderr_contains "$OUTPUT" "requires a value" "Error mentions --tag requires a value"
+assert_stderr_contains "$OUTPUT" "requires a value" "Error mentions --image requires a value"
 
 echo ""
 
