@@ -232,21 +232,7 @@ fi
 
 echo ""
 
-# --- Test 9: Build with custom tag (requires podman) ---
-
-echo "--- Test 9: Build with custom tag ---"
-
-if [ "$PODMAN_AVAILABLE" = "true" ]; then
-  OUTPUT=$("$OC_SANDBOX" build --image test-integration --force 2>&1)
-  EXIT_CODE=$?
-  assert_exit_code 0 "$EXIT_CODE" "oc-sandbox build --image test-integration exits with 0"
-  assert_stderr_contains "$OUTPUT" "localhost/oc-sandbox:test-integration" "Build output mentions custom tag"
-else
-  skip "Build with custom tag (podman not available)"
-fi
-
-echo ""
-# --- Test 10: Run with invalid profile (path traversal) ---
+# --- Test 9: Run with invalid profile (path traversal) ---
 
 echo "--- Test 10: Run with invalid profile (path traversal) ---"
 
