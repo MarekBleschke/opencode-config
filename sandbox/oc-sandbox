@@ -648,6 +648,14 @@ cmd_build() {
   local containerfile_path=""
   local force="false"
 
+  # Read default_image from config if available
+  local config_file="${HOME}/.config/oc-sandbox/config"
+  local configured_image
+  configured_image="$(_read_config_value "$config_file" "general" "default_image")"
+  if [ -n "$configured_image" ]; then
+    image_name="$configured_image"
+  fi
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
     -I | --image)
@@ -750,6 +758,14 @@ cmd_run() {
   local debug="false"
   local no_gh_token="false"
   local gh_token=""
+
+  # Read default_image from config if available
+  local config_file="${HOME}/.config/oc-sandbox/config"
+  local configured_image
+  configured_image="$(_read_config_value "$config_file" "general" "default_image")"
+  if [ -n "$configured_image" ]; then
+    image_name="$configured_image"
+  fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
