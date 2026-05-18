@@ -31,16 +31,20 @@ _oc-sandbox() {
     ;;
   esac
 }
+
 _oc-sandbox_build() {
   _arguments \
-    '(-t --tag)--tag[Tag for the built image]:tag:_oc-sandbox_image_tags' \
-    '(-f --force)--force[Force rebuild even if image exists]' \
+    '(-I --image)--image[Image name to build]:image:_oc-sandbox_images' \
+    '(-I)--image[image name to build]:image:_oc-sandbox_images' \
+    '(-f --file)--file[Explicit Containerfile path]:file:_files' \
+    '(-F --force)--force[Force rebuild even if image exists]' \
     '(-h --help)--help[Show help message]'
 }
 
 _oc-sandbox_run() {
   _arguments \
-    '(-t --tag)--tag[Tag of the image to run]:tag:_oc-sandbox_image_tags' \
+    '(-I --image)--image[Image to use]:image:_oc-sandbox_images' \
+    '(-I)--image[image to use]:image:_oc-sandbox_images' \
     '(-p --profile)--profile[Opencode profile to activate]:profile:_oc-sandbox_profiles' \
     '--no-ssh[Skip mounting SSH keys]' \
     '--no-auth[Skip mounting auth.json]' \
@@ -66,54 +70,52 @@ _oc-sandbox_completion() {
   _arguments \
     ':shell:_oc-sandbox_shells' \
     '--refresh[Force-refresh the completion cache]' \
-    '--tag[Refresh cache for a specific tag only]:tag:_oc-sandbox_image_tags' \
+    '(-I --image)--image[Refresh cache for a specific image only]:image:_oc-sandbox_images' \
+    '(-I)--image[image]:image:_oc-sandbox_images' \
     '(-h --help)--help[Show help message]'
 }
 
-_oc-sandbox_image_tags() {
-  local cache_file="$HOME/.cache/oc-sandbox/images"
-  if [[ -f "$cache_file" ]]; then
-    _values 'image tags' $(cat "$cache_file")
+_oc-sandbox_images() {
+  local script_dir="${SCRIPT_DIR:-}"
+  if [ -z "$script_dir" ]; then
+    # Fallback: derive from oc-sandbox location
+    script_dir="$(dirname "$(which oc-sandbox 2>/dev/null || echo "")")"
   fi
-  _oc-sandbox_maybe_refresh_cache
+  local containerfiles_dir="${script_dir}/containerfiles"
+  [[ -d "$containerfiles_dir" ]] || return 0
+  local -a images
+  local f
+  for f in "$containerfiles_dir"/*.Containerfile; do
+    [[ -f "$f" ]] || continue
+    images+=("${f##*/}")
+    images[-1]="${images[-1]%.Containerfile}"
+  done
+  _values 'image' $images
 }
 
 _oc-sandbox_profiles() {
-  local tag="main"
-  local i
-  for ((i = 2; i < CURRENT; i++)); do
-    if [[ "$words[i]" == --tag || "$words[i]" == -t ]]; then
-      tag="$words[i+1]"
-      break
-    fi
-    if [[ "$words[i]" == --tag=* ]]; then
-      tag="${words[i]#--tag=}"
-      break
-    fi
-  done
+  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  [[ -d "$profiles_dir" ]] || return 0
 
-  local cache_file="$HOME/.cache/oc-sandbox/profiles-${tag}"
-  if [[ -f "$cache_file" ]]; then
-    _values 'profiles' $(cat "$cache_file")
-  fi
-  _oc-sandbox_maybe_refresh_cache
+  local -a suggestions
+  local profile conf variant_name
+
+  for profile in "$profiles_dir"/*/; do
+    [[ -d "$profile" ]] || continue
+    [[ -f "$profile/profile.conf" ]] || continue
+    suggestions+=("$(basename "$profile")")
+    for conf in "$profile"/profile.*.conf; do
+      [[ -f "$conf" ]] || continue
+      variant_name="${conf##*profile.}"
+      variant_name="${variant_name%.conf}"
+      suggestions+=("$(basename "$profile"):${variant_name}")
+    done
+  done
+  _values 'profile' $suggestions
 }
 
 _oc-sandbox_shells() {
   _values 'shells' zsh
-}
-
-_oc-sandbox_maybe_refresh_cache() {
-  local meta_file="$HOME/.cache/oc-sandbox/cache.meta"
-  local images_ts=0
-  if [[ -f "$meta_file" ]]; then
-    images_ts=$(grep '^images_timestamp=' "$meta_file" 2>/dev/null | cut -d= -f2)
-  fi
-  local now=$(($(date +%s)))
-  local max_age=$((24 * 60 * 60))
-  if (((now - images_ts) > max_age)); then
-    (oc-sandbox completion --refresh >/dev/null 2>&1 &)
-  fi
 }
 
 compdef _oc-sandbox oc-sandbox
