@@ -35,7 +35,7 @@ RUN groupadd -g 1001 sandbox && \
   chown -R sandbox:sandbox /home/sandbox/.local
 
 # Init script
-COPY --chmod=755 sandbox/init.sh /usr/local/bin/oc-sandbox-init.sh
+COPY --chmod=755 init.sh /usr/local/bin/oc-sandbox-init.sh
 
 USER sandbox
 WORKDIR /workspace
