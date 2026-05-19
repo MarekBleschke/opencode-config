@@ -103,9 +103,12 @@ _oc-sandbox_profiles() {
     suggestions+=("$(basename "$profile")")
     for conf in "$profile"/profile.*.conf; do
       [[ -f "$conf" ]] || continue
+      # Skip the default profile.conf — `*` in the glob matches zero chars,
+      # so profile.*.conf also matches profile.conf itself.
+      [[ "$(basename "$conf")" == "profile.conf" ]] && continue
       variant_name="${conf##*profile.}"
       variant_name="${variant_name%.conf}"
-      suggestions+=("$(basename "$profile"):${variant_name}")
+      suggestions+=("$(basename "$profile")\:${variant_name}")
     done
   done
   _values 'profile' $suggestions

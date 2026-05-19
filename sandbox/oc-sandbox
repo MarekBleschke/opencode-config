@@ -253,7 +253,7 @@ cmd_install() {
   # Pre-fill [mounts] section on first config creation
   if [ "$config_created" = "true" ] && [ -f "$config_file" ]; then
     if ! grep -q '^\[mounts\]' "$config_file" 2>/dev/null; then
-      cat >> "$config_file" <<'MOUNTS_EOF'
+      cat >>"$config_file" <<'MOUNTS_EOF'
 
 [mounts]
 # Host paths mounted into the sandbox container: src_path|container_dst_path
@@ -394,7 +394,7 @@ cleanup_completions() {
   case "$shell" in
   zsh)
     local rc_file="${HOME}/.zshrc"
-    local completion_line='source <(oc-sandbox completion zsh)'
+    local completion_line='source <(oc-sandbox completion zsh/Users/marekbleschke/.local/bin/oc-sandbox)'
 
     if [ -f "$rc_file" ]; then
       if [ -L "$rc_file" ]; then
@@ -454,7 +454,7 @@ _read_config_value() {
         return 0
       fi
     fi
-  done < "$file"
+  done <"$file"
 
   return 0
 }
@@ -463,22 +463,22 @@ _read_config_value() {
 _expand_home() {
   local path="$1"
   case "$path" in
-    "~/"*) path="${HOME}/${path#"~/"}" ;;
-    "~") path="$HOME" ;;
+  "~/"*) path="${HOME}/${path#"~/"}" ;;
+  "~") path="$HOME" ;;
   esac
   case "$path" in
-    \$HOME/*)
-      path="${HOME}/${path#\$HOME/}"
-      ;;
-    \$HOME)
-      path="$HOME"
-      ;;
-    \$\{HOME\}/*)
-      path="${HOME}/${path#\$\{HOME\}/}"
-      ;;
-    \$\{HOME\})
-      path="$HOME"
-      ;;
+  \$HOME/*)
+    path="${HOME}/${path#\$HOME/}"
+    ;;
+  \$HOME)
+    path="$HOME"
+    ;;
+  \$\{HOME\}/*)
+    path="${HOME}/${path#\$\{HOME\}/}"
+    ;;
+  \$\{HOME\})
+    path="$HOME"
+    ;;
   esac
   echo "$path"
 }
@@ -520,6 +520,9 @@ _scan_profiles_with_variants() {
     echo "$(basename "$profile")"
     for conf in "$profile"/profile.*.conf; do
       [[ -f "$conf" ]] || continue
+      # Skip the default profile.conf — `*` in the glob matches zero chars,
+      # so profile.*.conf also matches profile.conf itself.
+      [[ "$(basename "$conf")" == "profile.conf" ]] && continue
       variant_name="${conf##*profile.}"
       variant_name="${variant_name%.conf}"
       echo "$(basename "$profile"):${variant_name}"
@@ -1119,7 +1122,7 @@ completion)
 --help | -h)
   usage_main
   exit 0
-;;
+  ;;
 *)
   error "Unknown command: $1\nUse 'oc-sandbox --help' for usage information."
   ;;
