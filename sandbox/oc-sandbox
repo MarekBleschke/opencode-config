@@ -4,21 +4,11 @@ set -euo pipefail
 # oc-sandbox - Run opencode in a containerized sandbox
 # Provides filesystem isolation and permission escalation protection
 
-_resolve_script_dir() {
-  local source="${BASH_SOURCE[0]}"
-  while [ -L "$source" ]; do
-    local dir
-    dir="$(cd "$(dirname "$source")" && pwd -P)"
-    source="$(readlink "$source")"
-    [[ "$source" != /* ]] && source="$dir/$source"
-  done
-  SCRIPT_DIR="$(cd "$(dirname "$source")" && pwd -P)"
-}
-_resolve_script_dir
-
-CONTAINERFILES_DIR="${SCRIPT_DIR}/containerfiles"
-OPENCODE_INSTALL_SHA256_FILE="${SCRIPT_DIR}/opencode-install.sha256"
-COMPLETION_ZSH="${SCRIPT_DIR}/completion_zsh"
+DATA_DIR="${OC_SANDBOX_DATA_DIR:-${HOME}/.local/share/oc-sandbox}"
+CONFIG_DIR="${OC_SANDBOX_CONFIG_DIR:-${HOME}/.config/oc-sandbox}"
+CONTAINERFILES_DIR="${DATA_DIR}/containerfiles"
+OPENCODE_INSTALL_SHA256_FILE="${DATA_DIR}/opencode-install.sha256"
+COMPLETION_ZSH="${DATA_DIR}/completion_zsh"
 IMAGE_BASE="localhost/oc-sandbox"
 DEFAULT_IMAGE="base"
 
