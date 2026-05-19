@@ -263,7 +263,7 @@ check_podman() {
 
 # List available profiles from the host profiles directory
 list_profiles() {
-  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  local profiles_dir="${CONFIG_DIR}/profiles"
   [[ -d "$profiles_dir" ]] || return 0
 
   local profile
@@ -276,7 +276,7 @@ list_profiles() {
 
 # Scan profiles including variants for completion
 _scan_profiles_with_variants() {
-  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  local profiles_dir="${CONFIG_DIR}/profiles"
   [[ -d "$profiles_dir" ]] || return 0
 
   local profile conf variant_name
@@ -445,7 +445,7 @@ cmd_run() {
   local gh_token=""
 
   # Read default_image from config if available
-  local config_file="${HOME}/.config/oc-sandbox/config"
+  local config_file="${CONFIG_DIR}/config"
   local configured_image
   configured_image="$(_read_config_value "$config_file" "general" "default_image")"
   if [ -n "$configured_image" ]; then
@@ -530,7 +530,7 @@ cmd_run() {
     fi
   fi
 
-  local config_file="${HOME}/.config/oc-sandbox/config"
+  local config_file="${CONFIG_DIR}/config"
 
   # If no profile from --profile flag, try config default
   if [ -z "$profile" ]; then
