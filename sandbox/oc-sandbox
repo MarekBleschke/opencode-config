@@ -348,7 +348,7 @@ cmd_build() {
   local force="false"
 
   # Read default_image from config if available
-  local config_file="${HOME}/.config/oc-sandbox/config"
+  local config_file="${CONFIG_DIR}/config"
   local configured_image
   configured_image="$(_read_config_value "$config_file" "general" "default_image")"
   if [ -n "$configured_image" ]; then
@@ -559,7 +559,7 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
   fi
 
   # Validate profile exists on host
-  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  local profiles_dir="${CONFIG_DIR}/profiles"
   local profile_path="${profiles_dir}/${profile}"
 
   if [ ! -d "$profile_path" ]; then
