@@ -1,20 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Logging: write to file (tmpfs, always writable) and stderr
+LOG_FILE="/tmp/oc-sandbox-init.log"
+: >"$LOG_FILE" # Truncate at start
+
+log_info() {
+  echo "[INFO] $*" >>"$LOG_FILE"
+  echo "[INFO] $*" >&2
+}
+
+log_error() {
+  echo "[ERROR] $*" >>"$LOG_FILE"
+  echo "[ERROR] $*" >&2
+}
+
+log_warn() {
+  echo "[WARN] $*" >>"$LOG_FILE"
+  echo "[WARN] $*" >&2
+}
+
+log_debug() {
+  echo "[DEBUG] $*" >>"$LOG_FILE"
+  echo "[DEBUG] $*" >&2
+}
+
+log_info "started init script"
+log_debug "HOME=${HOME:-UNSET}"
+log_debug "USER=$(whoami 2>/dev/null || echo UNKNOWN)"
+log_debug "PWD=${PWD:-UNSET}"
+log_debug "OC_SANDBOX_PROFILE=${OC_SANDBOX_PROFILE:-UNSET}"
+log_debug "\$#=$#"
+log_debug "\$@=$@"
+
 # oc-sandbox-init.sh — Container entrypoint
 # Resolves profile config, processes agent templates, launches opencode.
 # Receives the container's CMD as $@.
-
-# Debug mode: if CMD was overridden (e.g., /bin/bash), exec it directly
-if [ $# -gt 0 ]; then
-  exec "$@"
-fi
 
 # Parse OC_SANDBOX_PROFILE env var
 # Format: "profilename" or "profilename:variant"
 PROFILE_SPEC="${OC_SANDBOX_PROFILE:-}"
 if [ -z "$PROFILE_SPEC" ]; then
-  echo "Error: OC_SANDBOX_PROFILE environment variable not set" >&2
+  log_error "OC_SANDBOX_PROFILE environment variable not set"
   exit 1
 fi
 
@@ -27,16 +54,20 @@ fi
 
 # Validate profile name is not empty
 if [ -z "$PROFILE_NAME" ]; then
-  echo "Error: Empty profile name in OC_SANDBOX_PROFILE='${PROFILE_SPEC}'" >&2
+  log_error "Empty profile name in OC_SANDBOX_PROFILE='${PROFILE_SPEC}'"
   exit 1
 fi
 
 PROFILE_DIR="/mnt/oc-sandbox-profiles"
 CONFIG_FILE="/mnt/oc-sandbox-config/config"
 
+log_debug "PROFILE_NAME=${PROFILE_NAME}, PROFILE_VARIANT=${PROFILE_VARIANT:-<none>}"
+log_debug "PROFILE_DIR exists: $([ -d "$PROFILE_DIR" ] && echo yes || echo no)"
+log_debug "CONFIG_FILE exists: $([ -f "$CONFIG_FILE" ] && echo yes || echo no)"
+
 # Verify profile directory is mounted
 if [ ! -d "$PROFILE_DIR" ]; then
-  echo "Error: Profile directory not mounted at $PROFILE_DIR" >&2
+  log_error "Profile directory not mounted at $PROFILE_DIR"
   exit 1
 fi
 
@@ -48,9 +79,11 @@ else
 fi
 
 if [ ! -f "$CONF_FILE" ]; then
-  echo "Error: Profile config not found: $CONF_FILE" >&2
+  log_error "Profile config not found: $CONF_FILE"
   exit 1
 fi
+
+log_debug "CONF_FILE=${CONF_FILE}"
 
 # --- Read git config from mounted config file ---
 GIT_USER_NAME=""
@@ -75,11 +108,11 @@ if [ -f "$CONFIG_FILE" ]; then
       key_part="$(echo "$trimmed" | cut -d= -f1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
       value_part="$(echo "$trimmed" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
       case "$key_part" in
-        user_name) GIT_USER_NAME="$value_part" ;;
-        user_email) GIT_USER_EMAIL="$value_part" ;;
+      user_name) GIT_USER_NAME="$value_part" ;;
+      user_email) GIT_USER_EMAIL="$value_part" ;;
       esac
     fi
-  done < "$CONFIG_FILE"
+  done <"$CONFIG_FILE"
 fi
 
 # Write .gitconfig
@@ -88,8 +121,11 @@ if [ -n "$GIT_USER_NAME" ] || [ -n "$GIT_USER_EMAIL" ]; then
     printf '[user]\n'
     printf '\tname = %s\n' "$GIT_USER_NAME"
     printf '\temail = %s\n' "$GIT_USER_EMAIL"
-  } > /home/sandbox/.gitconfig
+  } >/home/sandbox/.gitconfig
+  log_debug "Wrote .gitconfig for ${GIT_USER_NAME:-<none>} <${GIT_USER_EMAIL:-<none>}>"
 fi
+
+log_debug "Git config section complete"
 
 # --- Read profile config (models section) ---
 declare -A MODELS
@@ -112,7 +148,9 @@ while IFS= read -r line || [ -n "$line" ]; do
     value_part="$(echo "$trimmed" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
     MODELS["$key_part"]="$value_part"
   fi
-done < "$CONF_FILE"
+done <"$CONF_FILE"
+
+log_debug "Parsed ${#MODELS[@]} model(s) from profile config"
 
 # --- Create resolved output directory ---
 RESOLVED_DIR="$HOME/.cache/oc-sandbox/resolved"
@@ -125,13 +163,15 @@ RESOLVED_PATH="${RESOLVED_DIR}/${RESOLVED_NAME}"
 
 # Guard against empty resolved name (shouldn't happen, but safety)
 if [ -z "$RESOLVED_NAME" ]; then
-  echo "Error: Could not determine resolved profile name" >&2
+  log_error "Could not determine resolved profile name"
   exit 1
 fi
 
 # Clean and recreate
 rm -rf "$RESOLVED_PATH"
 mkdir -p "$RESOLVED_PATH"
+
+log_debug "RESOLVED_PATH=${RESOLVED_PATH}, exists: $([ -d "$RESOLVED_PATH" ] && echo yes || echo no)"
 
 # --- Process agent files: copy + placeholder replacement ---
 if [ -d "${PROFILE_DIR}/agents" ]; then
@@ -154,7 +194,8 @@ if [ -d "${PROFILE_DIR}/agents" ]; then
 
   # Validate no unresolved placeholders remain
   if grep -rq '{{MODEL_' "${RESOLVED_PATH}/agents/" 2>/dev/null; then
-    echo "Warning: Unresolved MODEL placeholders in agent files" >&2
+    log_warn "Unresolved MODEL placeholders in agent files"
+    grep -rn '{{MODEL_' "${RESOLVED_PATH}/agents/" >>"$LOG_FILE" 2>&1 || true
     grep -rn '{{MODEL_' "${RESOLVED_PATH}/agents/" >&2 || true
   fi
 fi
@@ -172,8 +213,15 @@ for profile_item in "${PROFILE_DIR}"/*; do
   ln -s "$profile_item" "${RESOLVED_PATH}/${item_name}"
 done
 
+log_debug "Symlinks created, RESOLVED_PATH contents:"
+ls -la "${RESOLVED_PATH}/" >>"$LOG_FILE" 2>&1 || true
+
 # --- Launch opencode ---
 # Note: $@ is empty at this point (debug mode already handled above),
 # but preserved for future CMD passthrough support
 export OPENCODE_CONFIG_DIR="${RESOLVED_PATH}"
-exec opencode "$@"
+log_info "init script completed successfully"
+log_debug "OPENCODE_CONFIG_DIR=${OPENCODE_CONFIG_DIR}"
+log_debug "Environment:"
+env >>"$LOG_FILE" 2>&1 || true
+exec "$@"
