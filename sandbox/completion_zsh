@@ -35,7 +35,6 @@ _oc-sandbox() {
 _oc-sandbox_build() {
   _arguments \
     '(-I --image)--image[Image name to build]:image:_oc-sandbox_images' \
-    '(-I)--image[image name to build]:image:_oc-sandbox_images' \
     '(-f --file)--file[Explicit Containerfile path]:file:_files' \
     '(-F --force)--force[Force rebuild even if image exists]' \
     '(-h --help)--help[Show help message]'
@@ -44,7 +43,6 @@ _oc-sandbox_build() {
 _oc-sandbox_run() {
   _arguments \
     '(-I --image)--image[Image to use]:image:_oc-sandbox_images' \
-    '(-I)--image[image to use]:image:_oc-sandbox_images' \
     '(-p --profile)--profile[Opencode profile to activate]:profile:_oc-sandbox_profiles' \
     '--no-ssh[Skip mounting SSH keys]' \
     '--no-auth[Skip mounting auth.json]' \
@@ -71,7 +69,6 @@ _oc-sandbox_completion() {
     ':shell:_oc-sandbox_shells' \
     '--refresh[Force-refresh the completion cache]' \
     '(-I --image)--image[Refresh cache for a specific image only]:image:_oc-sandbox_images' \
-    '(-I)--image[image]:image:_oc-sandbox_images' \
     '(-h --help)--help[Show help message]'
 }
 
