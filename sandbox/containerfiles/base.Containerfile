@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # System dependencies
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-    git curl ca-certificates openssh-client zsh vim \
+    git curl ca-certificates openssh-client zsh vim shellcheck \
   && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
