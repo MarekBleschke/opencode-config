@@ -73,12 +73,17 @@ _oc-sandbox_completion() {
 }
 
 _oc-sandbox_images() {
-  local script_dir="${SCRIPT_DIR:-}"
-  if [ -z "$script_dir" ]; then
-    # Fallback: derive from oc-sandbox location
-    script_dir="$(dirname "$(which oc-sandbox 2>/dev/null || echo "")")"
-  fi
-  local containerfiles_dir="${script_dir}/containerfiles"
+  local script_dir
+  local source="${BASH_SOURCE[0]}"
+  while [ -L "$source" ]; do
+    local dir
+    dir="$(cd "$(dirname "$source")" && pwd -P)"
+    source="$(readlink "$source")"
+    [[ "$source" != /* ]] && source="$dir/$source"
+  done
+  script_dir="$(cd "$(dirname "$source")" && pwd -P)"
+
+  local containerfiles_dir="${script_dir}/sandbox/containerfiles"
   [[ -d "$containerfiles_dir" ]] || return 0
   local -a images
   local f
