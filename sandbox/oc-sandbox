@@ -164,7 +164,8 @@ info() {
 }
 
 cleanup_completions() {
-  local shell="$(basename "${SHELL:-}")"
+  local shell
+  shell="$(basename "${SHELL:-}")"
   case "$shell" in
   zsh)
     local rc_file="${HOME}/.zshrc"
@@ -226,11 +227,12 @@ _read_config_value() {
 }
 
 # Expand leading ~, ~/, $HOME, $HOME/, ${HOME}, ${HOME}/ in a path
+# shellcheck disable=SC2088
 _expand_home() {
   local path="$1"
   case "$path" in
-  "~/"*) path="${HOME}/${path#"~/"}" ;;
-  "~") path="$HOME" ;;
+  '~/') path="${HOME}/${path#'~'/}" ;;
+  '~') path="$HOME" ;;
   esac
   case "$path" in
   \$HOME/*)
@@ -283,7 +285,7 @@ _scan_profiles_with_variants() {
   for profile in "$profiles_dir"/*/; do
     [[ -d "$profile" ]] || continue
     [[ -f "$profile/profile.conf" ]] || continue
-    echo "$(basename "$profile")"
+    basename "$profile"
     for conf in "$profile"/profile.*.conf; do
       [[ -f "$conf" ]] || continue
       # Skip the default profile.conf — `*` in the glob matches zero chars,

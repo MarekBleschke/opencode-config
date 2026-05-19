@@ -142,13 +142,13 @@ main() {
     if [ -n "$git_name" ] || [ -n "$git_email" ]; then
       if [ -n "$git_name" ]; then
         local escaped_name
-        escaped_name="$(echo "$git_name" | sed 's/&/\\&/g')"
+        escaped_name="${git_name//&/\\&}"
         sed -i.bak "s|^user_name =.*|user_name = ${escaped_name}|" "$config_file"
         rm -f "$config_file.bak"
       fi
       if [ -n "$git_email" ]; then
         local escaped_email
-        escaped_email="$(echo "$git_email" | sed 's/&/\\&/g')"
+        escaped_email="${git_email//&/\\&}"
         sed -i.bak "s|^user_email =.*|user_email = ${escaped_email}|" "$config_file"
         rm -f "$config_file.bak"
       fi
@@ -197,7 +197,8 @@ MOUNTS_EOF
   fi
 
   if [ "$no_completions" = "false" ]; then
-    local shell="$(basename "${SHELL:-}")"
+    local shell
+    shell="$(basename "${SHELL:-}")"
     case "$shell" in
     zsh)
       local rc_file="${HOME}/.zshrc"
