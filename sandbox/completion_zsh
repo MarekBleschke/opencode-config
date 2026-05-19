@@ -75,7 +75,7 @@ _oc-sandbox_images() {
 }
 
 _oc-sandbox_profiles() {
-  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  local profiles_dir="${OC_SANDBOX_CONFIG_DIR:-$HOME/.config/oc-sandbox}/profiles"
   [[ -d "$profiles_dir" ]] || return 0
 
   local -a suggestions
