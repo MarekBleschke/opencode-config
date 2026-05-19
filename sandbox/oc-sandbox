@@ -127,27 +127,25 @@ cmd_uninstall() {
   done
 
   local install_path="${HOME}/.local/bin/oc-sandbox"
-  local script_path="${SCRIPT_DIR}/oc-sandbox"
 
   if [ ! -e "$install_path" ] && [ ! -L "$install_path" ]; then
     info "Not installed at ${install_path}"
     exit 0
   fi
 
-  if [ ! -L "$install_path" ]; then
-    warn "Not a symlink, refusing to remove ${install_path}"
-    exit 1
-  fi
-
-  local current_target
-  current_target="$(readlink "$install_path")"
-  if [ "$current_target" != "$script_path" ]; then
-    warn "Symlink points to a different location, refusing to remove ${install_path}"
-    exit 1
-  fi
-
-  rm "$install_path"
+  rm -f "$install_path"
   info "Uninstalled ${install_path}"
+
+  if [ -d "$DATA_DIR" ]; then
+    rm -rf "$DATA_DIR"
+    info "Removed data directory ${DATA_DIR}"
+  fi
+
+  local cache_dir="${HOME}/.cache/oc-sandbox"
+  if [ -d "$cache_dir" ]; then
+    rm -rf "$cache_dir" || warn "Could not remove cache directory ${cache_dir}"
+    info "Removed completion cache from ${cache_dir}"
+  fi
 
   cleanup_completions
 }
@@ -170,7 +168,7 @@ cleanup_completions() {
   case "$shell" in
   zsh)
     local rc_file="${HOME}/.zshrc"
-    local completion_line='source <(oc-sandbox completion zsh/Users/marekbleschke/.local/bin/oc-sandbox)'
+    local completion_line='source <(oc-sandbox completion zsh)'
 
     if [ -f "$rc_file" ]; then
       if [ -L "$rc_file" ]; then
