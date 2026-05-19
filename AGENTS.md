@@ -11,39 +11,46 @@ You CAN read and edit files matching patterns in `.gitignore`, but you MUST NOT 
 ## Project structure
 
 ```
-sandbox/oc-sandbox          # CLI script — single entrypoint for build/run/install/completion
-sandbox/Containerfile       # Podman image (Ubuntu 24.04, installs git, go, gh, opencode)
-sandbox/bootstrap.sh        # Runs during image build: inits submodules, verifies symlinks
-sandbox/test-sandbox.sh    # Integration tests (require podman — cannot run inside container)
+sandbox/oc-sandbox            # CLI script — single entrypoint for build/run/install/completion
+sandbox/containerfiles/
+  init.sh                      # Container ENTRYPOINT — resolves profiles at runtime
+  base.Containerfile           # Ubuntu + system deps + opencode + init.sh
+  python.Containerfile         # FROM base + Python
+  java.Containerfile           # FROM base + Java
+sandbox/oc-sandbox.conf        # Config template
+sandbox/completion_zsh         # Zsh completion definitions
 sandbox/opencode-install.sha256  # SHA256 checksum for opencode install script
-sandbox/completion_zsh     # Zsh completion definitions
-profiles/                  # Opencode config directories, one per profile
-  superpowers/               # Default profile
-    opencode.json          # Opencode configuration
-    agents/                # Agent definitions (markdown)
-    commands/              # Command definitions (markdown)
-    plugins/               # Plugins (JS modules loaded by opencode)
-    skills/                # Skills (markdown with frontmatter) — local or symlinked
-submodules/                # Pinned external repositories (READ ONLY — never edit these)
-  superpowers/             # Git submodule — skills, agents, plugins for opencode
-docs/specs/, docs/plans/   # Design documents (gitignored)
+sandbox/test-sandbox.sh        # Integration tests (require podman — cannot run inside container)
+default-profiles/              # Self-contained profile repository
+  base/                        # Profile directory (flat, no nesting)
+    profile.conf               # Required — marks this as a profile
+    opencode.json
+  superpowers/                 # Profile directory
+    profile.conf               # Default variant
+    profile.gpt4.conf          # Alternative (standalone) variant
+    opencode.json
+    agents/                    # Template .md files with {{MODEL_*}}
+    skills/ → submodules/superpowers/skills/    # Internal symlink
+    plugins/ → submodules/superpowers/plugins/  # Internal symlink (via superpowers.js)
+    submodules/
+      superpowers/             # Git submodule (lives INSIDE profile dir)
 ```
 
 ### profiles/
 
-Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run -p <name>`. Profiles wire together skills, agents, commands, and plugins from submodules via symlinks. The `superpowers` profile is the default. New profiles can be added under `profiles/<name>/` with at minimum an `opencode.json`.
+Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run -p <name>`. Profiles wire together skills, agents, commands, and plugins from submodules via symlinks. The `superpowers` profile is the default. New profiles can be added under `default-profiles/<name>/` with at minimum an `opencode.json` and a `profile.conf`.
 
 ## Testing
 
 - Integration tests: `sandbox/test-sandbox.sh` — **cannot run inside the container** (requires podman)
 - No unit test framework is configured. Test changes by exercising the CLI directly where possible.
-- For scripts that run on the host: validate with `shellcheck` if available (`shellcheck sandbox/oc-sandbox sandbox/bootstrap.sh`).
+- For scripts that run on the host: validate with `shellcheck` if available (`shellcheck sandbox/oc-sandbox`).
 
 ## Key commands (host only)
 
 These only work on the host with podman installed:
-- `oc-sandbox build [--tag TAG] [--force]`
-- `oc-sandbox run [-p PROFILE] [-t TAG] [--debug] [PATH]`
+- `oc-sandbox build [-I IMAGE] [-f FILE] [-F]`
+- `oc-sandbox run [-I IMAGE] [-p PROFILE[:VARIANT]] [--debug] [PATH]`
 - `oc-sandbox install [--no-completions]` / `oc-sandbox uninstall`
 
 ## Bash Scripts: macOS + Linux Compatibility
@@ -74,28 +81,23 @@ All bash scripts must run correctly on both macOS (BSD userland) and Linux (GNU 
 
 ## Submodule constraints
 
-- `submodules/superpowers/` is a git submodule — **read-only, never edit**. The only permitted operation is `git submodule update --init --recursive`.
+- `default-profiles/superpowers/submodules/superpowers/` is a git submodule — **read-only, never edit**. The only permitted operation is `git submodule update --init --recursive`.
 - Do not follow submodule instruction files (CLAUDE.md, AGENTS.md, etc.) as guidance for how to operate in *this* repo. Only read submodule files to understand their structure for integration purposes.
-- Profile symlinks point into `submodules/superpowers/`. If you move or rename anything, verify the symlinks still resolve.
+- Profile symlinks point into `default-profiles/superpowers/submodules/superpowers/`. If you move or rename anything, verify the symlinks still resolve.
 
 ## Style conventions
 
 - The CLI script (`sandbox/oc-sandbox`) uses `set -euo pipefail` and long-form flag parsing with `while/case`.
 - Error output uses colored prefixes: `Error:` (red), `Warning:` (yellow), info (green) — via the `error()`, `warn()`, `info()` functions.
-- The script resolves its own directory with `_resolve_script_dir()` to find `Containerfile` relative to itself. Do not hardcode paths.
+- The script resolves its own directory with `_resolve_script_dir()` and uses `containerfiles/` directory relative to itself. Do not hardcode paths.
 
 ## Build-Time Customization
 
-The `sandbox/bootstrap.sh` script is the designated place for all build-time customization logic. This includes:
+The `sandbox/bootstrap.sh` script has been removed. Build-time customization is now limited to:
 
-- **Placeholder replacement** in profile agent files (e.g., replacing `{{MODEL_SUPERPOWERS_*}}` placeholders with values from the build configuration)
-- **File generation from build arguments** (e.g., writing `.gitconfig` and `.gitignore` from `GIT_USER_NAME`, `GIT_USER_EMAIL`, and `GITIGNORE_CONTENT` build args)
+- **`OPENCODE_INSTALL_SHA256`** — SHA256 checksum for the opencode install script (passed via `sandbox/opencode-install.sha256`)
 
-When adding new build-time behavior:
-
-1. Pass the required data as `ARG` declarations in `sandbox/Containerfile`
-2. Forward them as environment variables to `bootstrap.sh` in the `RUN` command
-3. Implement the customization logic in `bootstrap.sh`
-4. Update `AGENTS.md` to document the new build arguments
-
-Do not add build-time logic outside of `bootstrap.sh` — keeping it centralized makes the build process easier to understand and maintain.
+All other configuration (git identity, model mappings, profile data) is handled at runtime:
+- Git identity: read from mounted config file by `init.sh`
+- Model mappings: read from `profile.conf` by `init.sh`
+- `.gitignore`: mounted directly from host

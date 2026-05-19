@@ -15,11 +15,12 @@ _resolve_script_dir() {
   SCRIPT_DIR="$(cd "$(dirname "$source")" && pwd -P)"
 }
 _resolve_script_dir
-CONTAINERFILE="${SCRIPT_DIR}/Containerfile"
+
+CONTAINERFILES_DIR="${SCRIPT_DIR}/containerfiles"
 OPENCODE_INSTALL_SHA256_FILE="${SCRIPT_DIR}/opencode-install.sha256"
 COMPLETION_ZSH="${SCRIPT_DIR}/completion_zsh"
-IMAGE_BASE="localhost/opencode-sandbox"
-DEFAULT_TAG="main"
+IMAGE_BASE="localhost/oc-sandbox"
+DEFAULT_IMAGE="base"
 
 # Terminal colors
 RED='\033[0;31m'
@@ -41,11 +42,10 @@ Commands:
 Run 'oc-sandbox <command> --help' for more information on a command.
 
 Examples:
-    oc-sandbox build                        # Build image with default tag "main"
-    oc-sandbox build --tag experiment       # Build image tagged "experiment"
-    oc-sandbox run                           # Run with defaults (tag: main, profile: from config, path: .)
-    oc-sandbox run --profile web-dev         # Use web-dev profile
-    oc-sandbox run -p systems ~/projects/x   # Use systems profile, specific project dir
+    oc-sandbox build                        # Build base image
+    oc-sandbox build --image python         # Build python image
+    oc-sandbox run                           # Run with defaults (image: base, profile: from config)
+    oc-sandbox run --profile superpowers:gpt4  # Use superpowers profile, gpt4 variant
 EOF
 }
 
@@ -56,8 +56,9 @@ Usage: oc-sandbox build [OPTIONS]
 Build a container image for the opencode sandbox.
 
 Options:
-    -t, --tag <TAG>      Tag for the built image (default: main)
-    -f, --force          Force rebuild even if image already exists
+    -I, --image <NAME>   Image name to build (default: base)
+    -f, --file <PATH>    Explicit Containerfile path (overrides --image)
+    -F, --force          Force rebuild even if image already exists
     -h, --help           Show this help message
 EOF
 }
@@ -69,23 +70,23 @@ Usage: oc-sandbox run [OPTIONS] [PATH]
 Run opencode in a containerized sandbox with filesystem isolation.
 
 Options:
-    -t, --tag <TAG>            Tag of the image to run (default: main)
-    -p, --profile <NAME>      Opencode profile to activate (default: from config)
-    --no-ssh                  Skip mounting SSH keys from host
-    --no-auth                 Skip mounting auth.json from host
-    --no-gh-token             Skip GH_TOKEN detection from host
-    --gh-token <TOKEN>        Use the provided GitHub token instead of auto-detecting
-    --debug                   Run /bin/bash instead of opencode for debugging
-    -h, --help                Show this help message
+    -I, --image <NAME>           Image to use (default: base)
+    -p, --profile <NAME[:VARIANT]>  Opencode profile to activate (default: from config)
+    --no-ssh                     Skip mounting SSH keys from host
+    --no-auth                    Skip mounting auth.json from host
+    --no-gh-token                Skip GH_TOKEN detection from host
+    --gh-token <TOKEN>           Use the provided GitHub token instead of auto-detecting
+    --debug                      Run /bin/bash instead of opencode for debugging
+    -h, --help                   Show this help message
 
 Arguments:
     PATH   Directory to mount as /workspace (default: current working directory)
 
 Examples:
-    oc-sandbox run                           # Run with defaults (tag: main, profile: from config, path: .)
-    oc-sandbox run --profile web-dev         # Use web-dev profile
-    oc-sandbox run -p systems ~/projects/x   # Use systems profile, specific project dir
-    oc-sandbox run --tag experiment          # Run the "experiment" tagged image
+    oc-sandbox run                              # Run with defaults
+    oc-sandbox run --profile superpowers         # Use superpowers profile
+    oc-sandbox run -p superpowers:gpt4           # Use gpt4 variant
+    oc-sandbox run --image python                # Use python image
 EOF
 }
 
@@ -132,13 +133,13 @@ Shells:
 
 Options:
     --refresh           Force-refresh the completion cache
-    --tag <TAG>         Refresh cache for a specific tag only (used with --refresh)
+    --image <NAME>      Refresh cache for a specific image only (used with --refresh)
     -h, --help          Show this help message
 
 Examples:
     source <(oc-sandbox completion zsh)    # Enable Zsh completions
     oc-sandbox completion --refresh        # Manually refresh all cached data
-    oc-sandbox completion --refresh --tag main  # Refresh cache for tag "main" only
+    oc-sandbox completion --refresh --image base  # Refresh cache for image "base" only
 EOF
 }
 
@@ -179,7 +180,6 @@ cmd_install() {
     current_target="$(readlink "$install_path")"
     if [ "$current_target" = "$script_path" ]; then
       info "Already installed at ${install_path}"
-      # Still set up completions unless --no-completions was specified
       if [ "$no_completions" = "false" ]; then
         setup_completions
       fi
@@ -233,14 +233,12 @@ cmd_install() {
 
     if [ -n "$git_name" ] || [ -n "$git_email" ]; then
       if [ -n "$git_name" ]; then
-        # Escape & for sed replacement and use | as delimiter to handle / in names
         local escaped_name
         escaped_name="$(echo "$git_name" | sed 's/&/\\&/g')"
         sed -i.bak "s|^user_name =.*|user_name = ${escaped_name}|" "$config_file"
         rm -f "$config_file.bak"
       fi
       if [ -n "$git_email" ]; then
-        # Escape & for sed replacement and use | as delimiter to handle / in emails
         local escaped_email
         escaped_email="$(echo "$git_email" | sed 's/&/\\&/g')"
         sed -i.bak "s|^user_email =.*|user_email = ${escaped_email}|" "$config_file"
@@ -254,9 +252,8 @@ cmd_install() {
 
   # Pre-fill [mounts] section on first config creation
   if [ "$config_created" = "true" ] && [ -f "$config_file" ]; then
-    # Check if [mounts] section already exists (it shouldn't on first creation from template)
     if ! grep -q '^\[mounts\]' "$config_file" 2>/dev/null; then
-      cat >> "$config_file" <<'MOUNTS_EOF'
+      cat >>"$config_file" <<'MOUNTS_EOF'
 
 [mounts]
 # Host paths mounted into the sandbox container: src_path|container_dst_path
@@ -266,6 +263,27 @@ auth_json = ~/.local/share/opencode/auth.json|/home/sandbox/.local/share/opencod
 MOUNTS_EOF
       info "Pre-filled [mounts] section with default paths"
     fi
+  fi
+
+  # Install default profiles as symlinks
+  local profiles_source="${SCRIPT_DIR}/../default-profiles"
+  local profiles_target="${config_dir}/profiles"
+
+  if [ -d "$profiles_source" ]; then
+    if [ ! -d "$profiles_target" ]; then
+      mkdir -p "$profiles_target"
+    fi
+
+    local profile_dir name
+    for profile_dir in "$profiles_source"/*/; do
+      [[ -d "$profile_dir" ]] || continue
+      [[ -f "$profile_dir/profile.conf" ]] || continue
+      name="$(basename "$profile_dir")"
+      local abs_path
+      abs_path="$(cd "$profile_dir" && pwd)"
+      ln -sf "$abs_path" "$profiles_target/$name"
+      info "Installed profile: $name"
+    done
   fi
 
   info "Config file location: ${config_file}"
@@ -317,10 +335,7 @@ cmd_uninstall() {
   rm "$install_path"
   info "Uninstalled ${install_path}"
 
-  # Clean up shell completions
   cleanup_completions
-
-  # Clean up completion cache
   cleanup_cache
 }
 
@@ -344,17 +359,14 @@ setup_completions() {
     local rc_file="${HOME}/.zshrc"
     local completion_line='source <(oc-sandbox completion zsh)'
 
-    # Handle symlinked .zshrc
     if [ -L "$rc_file" ]; then
       info ".zshrc is a symlink; completions will be added to the target file"
     fi
 
-    # Create .zshrc if it doesn't exist
     if [ ! -f "$rc_file" ]; then
       touch "$rc_file"
     fi
 
-    # Check if completion line already exists (idempotent)
     if grep -qF "$completion_line" "$rc_file" 2>/dev/null; then
       info "Shell completions already set up in ${rc_file}"
     else
@@ -374,7 +386,6 @@ setup_completions() {
     ;;
   esac
 
-  # Seed the completion cache
   oc-sandbox completion --refresh >/dev/null 2>&1 || true
 }
 
@@ -383,14 +394,13 @@ cleanup_completions() {
   case "$shell" in
   zsh)
     local rc_file="${HOME}/.zshrc"
-    local completion_line='source <(oc-sandbox completion zsh)'
+    local completion_line='source <(oc-sandbox completion zsh/Users/marekbleschke/.local/bin/oc-sandbox)'
 
     if [ -f "$rc_file" ]; then
       if [ -L "$rc_file" ]; then
         info ".zshrc is a symlink; removing completions from the target file"
       fi
 
-      # Remove the completion line
       local tmp_file
       tmp_file=$(mktemp)
       grep -vF "$completion_line" "$rc_file" >"$tmp_file" || true
@@ -399,7 +409,6 @@ cleanup_completions() {
       info "Removed shell completions from ${rc_file}"
     fi
     ;;
-    # bash/fish: nothing to clean up (not implemented yet)
   esac
 }
 
@@ -412,29 +421,22 @@ cleanup_cache() {
 }
 
 # Read a value from an INI-style config file
-# Usage: _read_config_value <file> <section> <key>
-# Returns the value (may be empty) or empty string if not found
 _read_config_value() {
   local file="$1"
   local section="$2"
   local key="$3"
 
-  # Gracefully handle missing config file — callers use empty return to fall back
   [ -f "$file" ] || return 0
 
   local in_section="false"
   local line trimmed key_part value_part
 
   while IFS= read -r line || [ -n "$line" ]; do
-    # Trim leading/trailing whitespace
     trimmed="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-
-    # Skip empty lines and comments
     [ -z "$trimmed" ] && continue
     [[ "$trimmed" == \#* ]] && continue
     [[ "$trimmed" == \;* ]] && continue
 
-    # Check for section header
     if [[ "$trimmed" == \[*\] ]]; then
       if [ "$trimmed" = "[$section]" ]; then
         in_section="true"
@@ -444,7 +446,6 @@ _read_config_value() {
       continue
     fi
 
-    # If in target section, check for key match
     if [ "$in_section" = "true" ]; then
       key_part="$(echo "$trimmed" | cut -d= -f1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
       if [ "$key_part" = "$key" ]; then
@@ -453,41 +454,35 @@ _read_config_value() {
         return 0
       fi
     fi
-  done < "$file"
+  done <"$file"
 
   return 0
 }
 
 # Expand leading ~, ~/, $HOME, $HOME/, ${HOME}, ${HOME}/ in a path
-# Usage: _expand_home <path>
 _expand_home() {
   local path="$1"
-  # Expand ~/ or ~
   case "$path" in
-    "~/"*) path="${HOME}/${path#"~/"}" ;;
-    "~") path="$HOME" ;;
+  "~/"*) path="${HOME}/${path#"~/"}" ;;
+  "~") path="$HOME" ;;
   esac
-  # Expand $HOME, ${HOME}, $HOME/, ${HOME}/ — literal string matching
   case "$path" in
-    \$HOME/*)
-      path="${HOME}/${path#\$HOME/}"
-      ;;
-    \$HOME)
-      path="$HOME"
-      ;;
-    \$\{HOME\}/*)
-      path="${HOME}/${path#\$\{HOME\}/}"
-      ;;
-    \$\{HOME\})
-      path="$HOME"
-      ;;
+  \$HOME/*)
+    path="${HOME}/${path#\$HOME/}"
+    ;;
+  \$HOME)
+    path="$HOME"
+    ;;
+  \$\{HOME\}/*)
+    path="${HOME}/${path#\$\{HOME\}/}"
+    ;;
+  \$\{HOME\})
+    path="$HOME"
+    ;;
   esac
   echo "$path"
 }
 
-# Read a mount config value and return "src|dst" or empty string
-# Usage: _read_mount_config <config_file> <key>
-# Returns the raw value from [mounts] section, or empty if not found
 _read_mount_config() {
   local file="$1"
   local key="$2"
@@ -500,42 +495,60 @@ check_podman() {
   fi
 }
 
-# List available profiles from a container image
+# List available profiles from the host profiles directory
 list_profiles() {
-  local image_name="$1"
-  local profiles
-  profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/oc-sandbox/profiles/ 2>/dev/null | grep -v '^\.' || true)
-  if [ -z "$profiles" ]; then
-    echo "  (no profiles found)"
-  else
-    echo "$profiles" | while read -r profile; do
-      echo "  - $profile"
-    done
-  fi
+  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  [[ -d "$profiles_dir" ]] || return 0
+
+  local profile
+  for profile in "$profiles_dir"/*/; do
+    [[ -d "$profile" ]] || continue
+    [[ -f "$profile/profile.conf" ]] || continue
+    echo "  - $(basename "$profile")"
+  done
 }
 
-_refresh_profiles_for_tag() {
-  local tag_name="$1"
+# Scan profiles including variants for completion
+_scan_profiles_with_variants() {
+  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  [[ -d "$profiles_dir" ]] || return 0
+
+  local profile conf variant_name
+  for profile in "$profiles_dir"/*/; do
+    [[ -d "$profile" ]] || continue
+    [[ -f "$profile/profile.conf" ]] || continue
+    echo "$(basename "$profile")"
+    for conf in "$profile"/profile.*.conf; do
+      [[ -f "$conf" ]] || continue
+      # Skip the default profile.conf — `*` in the glob matches zero chars,
+      # so profile.*.conf also matches profile.conf itself.
+      [[ "$(basename "$conf")" == "profile.conf" ]] && continue
+      variant_name="${conf##*profile.}"
+      variant_name="${variant_name%.conf}"
+      echo "$(basename "$profile"):${variant_name}"
+    done
+  done
+}
+
+_refresh_profiles_for_image() {
+  local image_name="$1"
   local cache_dir="$2"
   local now="$3"
-  local image_name="${IMAGE_BASE}:${tag_name}"
 
   if podman image exists "$image_name" 2>/dev/null; then
     local profiles
-    profiles=$(podman run --rm "$image_name" ls -1 /home/sandbox/oc-sandbox/profiles/ 2>/dev/null | grep -v '^\.' || true)
-    echo "$profiles" >"$cache_dir/profiles-${tag_name}"
-    echo "profiles-${tag_name}_timestamp=${now}" >>"$cache_dir/cache.meta"
+    profiles=$(_scan_profiles_with_variants)
+    echo "$profiles" >"$cache_dir/profiles-${image_name##*:}"
+    echo "profiles-${image_name##*:}_timestamp=${now}" >>"$cache_dir/cache.meta"
   fi
 }
 
 cmd_completion_refresh() {
-  local specific_tag="${1:-}"
+  local specific_image="${1:-}"
 
-  # Create cache directory if needed
   local cache_dir="${HOME}/.cache/oc-sandbox"
   mkdir -p "$cache_dir"
 
-  # Check if podman is available
   if ! command -v podman &>/dev/null; then
     warn "podman not found. Cache refresh skipped."
     return 0
@@ -544,11 +557,10 @@ cmd_completion_refresh() {
   local now
   now=$(date +%s)
 
-  # Refresh images list
   local images
   images=$(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${IMAGE_BASE}:" | sed "s|^${IMAGE_BASE}:||" || true)
   echo "$images" >"$cache_dir/images"
-  # Update images_timestamp while preserving profile timestamps
+
   local existing_profiles_ts=""
   if [[ -f "$cache_dir/cache.meta" ]]; then
     existing_profiles_ts=$(grep "^profiles-.*_timestamp=" "$cache_dir/cache.meta" 2>/dev/null || true)
@@ -558,26 +570,24 @@ cmd_completion_refresh() {
     echo "$existing_profiles_ts" >>"$cache_dir/cache.meta"
   fi
 
-  # Refresh profiles for specific tag or all tags
-  if [ -n "$specific_tag" ]; then
-    _refresh_profiles_for_tag "$specific_tag" "$cache_dir" "$now"
+  if [ -n "$specific_image" ]; then
+    _refresh_profiles_for_image "${IMAGE_BASE}:${specific_image}" "$cache_dir" "$now"
   else
-    # Refresh profiles for all known tags
-    local tag_name
-    while IFS= read -r tag_name; do
-      [ -z "$tag_name" ] && continue
-      _refresh_profiles_for_tag "$tag_name" "$cache_dir" "$now"
+    local image_name
+    while IFS= read -r image_name; do
+      [ -z "$image_name" ] && continue
+      _refresh_profiles_for_image "${IMAGE_BASE}:${image_name}" "$cache_dir" "$now"
     done <"$cache_dir/images"
   fi
 }
 
 cmd_completion_zsh() {
-  cat $COMPLETION_ZSH
+  cat "$COMPLETION_ZSH"
 }
 
 cmd_completion() {
   local refresh="false"
-  local tag=""
+  local image_arg=""
   local shell_arg=""
 
   while [[ $# -gt 0 ]]; do
@@ -586,11 +596,11 @@ cmd_completion() {
       refresh="true"
       shift
       ;;
-    --tag)
+    --image | -I)
       if [ -z "${2:-}" ]; then
-        error "Option --tag requires a value."
+        error "Option --image requires a value."
       fi
-      tag="$2"
+      image_arg="$2"
       shift 2
       ;;
     -h | --help)
@@ -601,7 +611,6 @@ cmd_completion() {
       error "Unknown option: $1\nUse 'oc-sandbox completion --help' for usage information."
       ;;
     *)
-      # Shell argument
       if [ -n "$shell_arg" ]; then
         error "Unknown argument: $1\nUse 'oc-sandbox completion --help' for usage information."
       fi
@@ -612,7 +621,7 @@ cmd_completion() {
   done
 
   if [ "$refresh" = "true" ]; then
-    cmd_completion_refresh "$tag"
+    cmd_completion_refresh "$image_arg"
     return
   fi
 
@@ -638,19 +647,35 @@ cmd_completion() {
 
 # Build subcommand
 cmd_build() {
-  local tag="$DEFAULT_TAG"
+  local image_name="$DEFAULT_IMAGE"
+  local containerfile_path=""
   local force="false"
+
+  # Read default_image from config if available
+  local config_file="${HOME}/.config/oc-sandbox/config"
+  local configured_image
+  configured_image="$(_read_config_value "$config_file" "general" "default_image")"
+  if [ -n "$configured_image" ]; then
+    image_name="$configured_image"
+  fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-    -t | --tag)
+    -I | --image)
       if [ -z "${2:-}" ]; then
-        error "Option --tag requires a value."
+        error "Option --image requires a value."
       fi
-      tag="$2"
+      image_name="$2"
       shift 2
       ;;
-    -f | --force)
+    -f | --file)
+      if [ -z "${2:-}" ]; then
+        error "Option --file requires a value."
+      fi
+      containerfile_path="$2"
+      shift 2
+      ;;
+    -F | --force)
       force="true"
       shift
       ;;
@@ -669,11 +694,18 @@ cmd_build() {
 
   check_podman
 
-  local image_name="${IMAGE_BASE}:${tag}"
+  # Resolve Containerfile path
+  if [ -n "$containerfile_path" ]; then
+    CONTAINERFILE="$containerfile_path"
+  else
+    CONTAINERFILE="${CONTAINERFILES_DIR}/${image_name}.Containerfile"
+  fi
+
+  local full_image="${IMAGE_BASE}:${image_name}"
 
   # Check if image already exists
-  if podman image exists "$image_name" 2>/dev/null && [ "$force" != "true" ]; then
-    info "Image ${image_name} already exists. Use --force to rebuild."
+  if podman image exists "$full_image" 2>/dev/null && [ "$force" != "true" ]; then
+    info "Image ${full_image} already exists. Use --force to rebuild."
     exit 0
   fi
 
@@ -692,77 +724,37 @@ cmd_build() {
     error "Checksum file is empty: $OPENCODE_INSTALL_SHA256_FILE"
   fi
 
-  # Verify config file exists
-  local config_file="${HOME}/.config/oc-sandbox/config"
-  if [ ! -f "$config_file" ]; then
-    error "Config file not found at ${config_file}. Run 'oc-sandbox install' first."
-  fi
-
-  # Build args array
+  # Build args — only OPENCODE_INSTALL_SHA256
   local build_args=(
     "--build-arg" "OPENCODE_INSTALL_SHA256=${sha256}"
   )
 
-  # Add git identity build args
-  local git_user_name git_user_email
-  git_user_name="$(_read_config_value "$config_file" "git" "user_name")"
-  git_user_email="$(_read_config_value "$config_file" "git" "user_email")"
-  build_args+=("--build-arg" "GIT_USER_NAME=${git_user_name}")
-  build_args+=("--build-arg" "GIT_USER_EMAIL=${git_user_email}")
-
-  # Add gitignore content
-  local gitignore_content=""
-  if [ -f "${HOME}/.gitignore" ]; then
-    gitignore_content="$(base64 < "${HOME}/.gitignore" | tr -d '\n')"
-  fi
-  build_args+=("--build-arg" "GITIGNORE_CONTENT=${gitignore_content}")
-
-  # Add model build args from [profile.superpowers]
-  local agent_name model_value arg_name
-  local agents=(
-    "brainstorm"
-    "planner"
-    "debugger"
-    "execution-orchestrator"
-    "software-engineer"
-    "senior-software-engineer"
-    "code-reviewer"
-    "spec-reviewer"
-    "utility"
-  )
-
-  for agent_name in "${agents[@]}"; do
-    model_value="$(_read_config_value "$config_file" "profile.superpowers" "$agent_name")"
-    arg_name="MODEL_SUPERPOWERS_$(echo "$agent_name" | tr 'a-z-' 'A-Z_')"
-    build_args+=("--build-arg" "${arg_name}=${model_value}")
-  done
-
-  info "Building container image ${image_name}..."
+  info "Building container image ${full_image}..."
   if ! podman build \
     "${build_args[@]}" \
-    -t "$image_name" \
+    -t "$full_image" \
     -f "$CONTAINERFILE" \
     "${SCRIPT_DIR}/.."; then
     error "Container build failed. See output above for details."
   fi
 
-  # Remove the named volume for this tag so next run starts fresh
-  local volume_name="opencode-sandbox-home-${tag}"
+  # Remove the named volume for this image so next run starts fresh
+  local volume_name="oc-sandbox-home-${image_name}"
   if podman volume exists "$volume_name" 2>/dev/null; then
     info "Removing existing volume ${volume_name} to ensure fresh state..."
     podman volume rm "$volume_name" >/dev/null 2>&1 || true
   fi
 
-  info "Image ${image_name} built successfully."
+  info "Image ${full_image} built successfully."
 
-  # Refresh completion cache for the built tag
-  oc-sandbox completion --refresh --tag "$tag" >/dev/null 2>&1 || true
+  oc-sandbox completion --refresh --image "$image_name" >/dev/null 2>&1 || true
 }
 
 # Run subcommand
 cmd_run() {
-  local tag="$DEFAULT_TAG"
+  local image_name="$DEFAULT_IMAGE"
   local profile=""
+  local profile_variant=""
   local workspace_path=""
   local no_ssh="false"
   local no_auth="false"
@@ -770,13 +762,21 @@ cmd_run() {
   local no_gh_token="false"
   local gh_token=""
 
+  # Read default_image from config if available
+  local config_file="${HOME}/.config/oc-sandbox/config"
+  local configured_image
+  configured_image="$(_read_config_value "$config_file" "general" "default_image")"
+  if [ -n "$configured_image" ]; then
+    image_name="$configured_image"
+  fi
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
-    -t | --tag)
+    -I | --image)
       if [ -z "${2:-}" ]; then
-        error "Option --tag requires a value."
+        error "Option --image requires a value."
       fi
-      tag="$2"
+      image_name="$2"
       shift 2
       ;;
     -p | --profile)
@@ -831,7 +831,23 @@ cmd_run() {
     error "Cannot use --gh-token with --no-gh-token"
   fi
 
-  # Config file path (needed for profile resolution and mount config)
+  # Parse profile:variant syntax
+  if [ -n "$profile" ]; then
+    profile_variant="${profile#*:}"
+    if [ "$profile_variant" = "$profile" ]; then
+      profile_variant=""
+    else
+      profile="${profile%%:*}"
+    fi
+  fi
+
+  # Validate profile name against path traversal
+  if [ -n "$profile" ]; then
+    if [[ "$profile" =~ [/\\\.] ]]; then
+      error "Profile name must not contain '/', '\\', or '.' characters."
+    fi
+  fi
+
   local config_file="${HOME}/.config/oc-sandbox/config"
 
   # If no profile from --profile flag, try config default
@@ -843,44 +859,45 @@ cmd_run() {
       error "No default profile configured and --profile not specified.
 Set a default profile in ${config_file:-~/.config/oc-sandbox/config}:
   [general]
-  default_profile = base
+  default_profile = superpowers
 Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     fi
   fi
 
   check_podman
 
-  local image_name="${IMAGE_BASE}:${tag}"
+  local full_image="${IMAGE_BASE}:${image_name}"
 
   # Check if image exists
-  if ! podman image exists "$image_name" 2>/dev/null; then
-    echo -e "${RED}Error: Image ${image_name} not found.${NC}" >&2
+  if ! podman image exists "$full_image" 2>/dev/null; then
+    echo -e "${RED}Error: Image '${full_image}' not found.${NC}" >&2
     echo "" >&2
-    echo "Available images:" >&2
-    local available_images
-    available_images=$(podman images --format "{{.Repository}}:{{.Tag}}" | grep "^${IMAGE_BASE}:" || true)
-    if [ -n "$available_images" ]; then
-      echo "$available_images" | while read -r img; do
-        echo "  - $img" >&2
-      done
-    else
-      echo "  (no opencode-sandbox images found)" >&2
-    fi
-    error "Run 'oc-sandbox build' first to build an image."
+    echo "Build it first: oc-sandbox build --image ${image_name}" >&2
+    exit 1
   fi
 
-  # Validate profile name doesn't contain path traversal characters
-  if [[ "$profile" =~ [/\\.] ]]; then
-    error "Profile name must not contain '/', '\\', or '.' characters."
-  fi
+  # Validate profile exists on host
+  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  local profile_path="${profiles_dir}/${profile}"
 
-  # Validate profile exists in the container image
-  if ! podman run --rm "$image_name" test -d "/home/sandbox/oc-sandbox/profiles/$profile" 2>/dev/null; then
-    echo -e "${RED}Error: Invalid profile: '$profile'${NC}" >&2
+  if [ ! -d "$profile_path" ]; then
+    echo -e "${RED}Error: Profile '${profile}' not found.${NC}" >&2
     echo "" >&2
     echo "Available profiles:" >&2
-    list_profiles "$image_name" >&2
+    list_profiles >&2
     exit 1
+  fi
+
+  if [ ! -f "${profile_path}/profile.conf" ]; then
+    error "Profile '${profile}' is missing profile.conf"
+  fi
+
+  # If variant specified, verify variant file exists
+  if [ -n "$profile_variant" ]; then
+    local variant_file="${profile_path}/profile.${profile_variant}.conf"
+    if [ ! -f "$variant_file" ]; then
+      error "Variant '${profile_variant}' not found for profile '${profile}'"
+    fi
   fi
 
   # Default workspace path to current directory
@@ -899,7 +916,6 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
 
   workspace_path="$(cd "$workspace_path" && pwd)"
 
-  # Double-check after cd resolves symlinks
   if [ ! -d "$workspace_path" ]; then
     error "PATH is not a directory: $workspace_path"
   fi
@@ -917,13 +933,12 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     fi
   fi
 
-  # SSH key auto-detection (configurable via [mounts] section)
+  # SSH key auto-detection
   local ssh_mounts=()
 
   if [ "$no_ssh" = "true" ]; then
     info "Skipping SSH key mount (--no-ssh)"
   else
-    # Read mount config or fall back to defaults
     local ssh_mount_value
     ssh_mount_value="$(_read_mount_config "$config_file" "ssh_key")"
     local ssh_key=""
@@ -936,7 +951,6 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
       ssh_key="$(_expand_home "$ssh_src_raw")"
     fi
 
-    # If config didn't provide valid values, fall back to defaults
     if [ -z "$ssh_key" ] || [ -z "$ssh_dst" ]; then
       ssh_key="${HOME}/.ssh/id_rsa"
       ssh_dst="/home/sandbox/.ssh/id_rsa"
@@ -948,7 +962,6 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
       if [ ! -r "$ssh_key" ]; then
         error "Cannot read SSH key at ${ssh_key}. Check file permissions."
       fi
-      # Permission check (GNU stat uses -c, BSD/macOS stat uses -f)
       local mode
       mode=$(stat -c '%a' "$ssh_key" 2>/dev/null || stat -f '%Lp' "$ssh_key" 2>/dev/null)
       if [ -n "$mode" ] && [ $((0$mode & 077)) -ne 0 ]; then
@@ -957,7 +970,6 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
       fi
       ssh_mounts+=("--mount" "type=bind,src=${ssh_key},dst=${ssh_dst},readonly,relabel=private")
       if [ -e "$ssh_pub_key" ]; then
-        # Public key always goes to the same basename with .pub extension
         local pub_dst="${ssh_dst}.pub"
         ssh_mounts+=("--mount" "type=bind,src=${ssh_pub_key},dst=${pub_dst},readonly,relabel=private")
       fi
@@ -966,13 +978,12 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     fi
   fi
 
-  # auth.json auto-detection (configurable via [mounts] section)
+  # auth.json auto-detection
   local auth_mount=()
 
   if [ "$no_auth" = "true" ]; then
     info "Skipping auth.json mount (--no-auth)"
   else
-    # Read mount config or fall back to defaults
     local auth_mount_value
     auth_mount_value="$(_read_mount_config "$config_file" "auth_json")"
     local auth_src=""
@@ -985,7 +996,6 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
       auth_src="$(_expand_home "$auth_src_raw")"
     fi
 
-    # If config didn't provide valid values, fall back to defaults
     if [ -z "$auth_src" ] || [ -z "$auth_dst" ]; then
       auth_src="${HOME}/.local/share/opencode/auth.json"
       auth_dst="/home/sandbox/.local/share/opencode/auth.json"
@@ -999,6 +1009,12 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     else
       warn "auth.json not found at ${auth_src}. Authenticated providers may not work."
     fi
+  fi
+
+  # .gitignore mount
+  local gitignore_mount=()
+  if [ -f "${HOME}/.gitignore" ]; then
+    gitignore_mount+=("--mount" "type=bind,src=${HOME}/.gitignore,dst=/home/sandbox/.gitignore,readonly,relabel=private")
   fi
 
   # GH_TOKEN auto-detection
@@ -1031,12 +1047,18 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     fi
   fi
 
-  local volume_name="opencode-sandbox-home-${tag}"
+  local volume_name="oc-sandbox-home-${image_name}"
+
+  # Build profile spec for env var
+  local profile_spec="$profile"
+  if [ -n "$profile_variant" ]; then
+    profile_spec="${profile}:${profile_variant}"
+  fi
 
   info "Starting opencode sandbox"
-  echo "  Profile:   $profile"
+  echo "  Profile:   $profile_spec"
   echo "  Workspace: $workspace_path"
-  echo "  Image:     $image_name"
+  echo "  Image:     $full_image"
   if [ "$debug" = "true" ]; then
     echo "  Debug:     /bin/bash"
   fi
@@ -1059,11 +1081,14 @@ Or use 'oc-sandbox run --profile <name>' to specify one at runtime."
     --cap-add CHOWN \
     --security-opt no-new-privileges:true \
     --mount type=bind,src="${workspace_path}",dst=/workspace,relabel=private \
+    --mount type=bind,src="${profile_path}",dst=/mnt/oc-sandbox-profiles,readonly,relabel=private \
+    --mount type=bind,src="${config_file}",dst=/mnt/oc-sandbox-config/config,readonly,relabel=private \
     ${ssh_mounts[@]+"${ssh_mounts[@]}"} \
     ${auth_mount[@]+"${auth_mount[@]}"} \
+    ${gitignore_mount[@]+"${gitignore_mount[@]}"} \
     ${gh_token_env[@]+"${gh_token_env[@]}"} \
-    --env "OPENCODE_CONFIG_DIR=/home/sandbox/oc-sandbox/profiles/${profile}" \
-    "$image_name" \
+    --env "OC_SANDBOX_PROFILE=${profile_spec}" \
+    "$full_image" \
     "$container_cmd"
 }
 

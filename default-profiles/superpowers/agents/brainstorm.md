@@ -1,6 +1,6 @@
 ---
 description: "Design and spec agent for creative work before implementation. Design/spec work only. No implementation."
-model: {{MODEL_SUPERPOWERS_BRAINSTORM}}
+model: {{MODEL_BRAINSTORM}}
 mode: primary
 temperature: 0.6
 color: accent
@@ -35,4 +35,3 @@ When a loaded skill contradicts the instructions below, you MUST follow these ov
 You MUST NOT break these rules under any circumstances.These boundaries apply to THIS agent only. Do not include your own boundaries in subagent prompts.
 
 - No modifications to files other than current spec, except if user explicitly instructs otherwise.
-

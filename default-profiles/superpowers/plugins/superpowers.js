@@ -1,0 +1,1 @@
+../submodules/superpowers/.opencode/plugins/superpowers.js

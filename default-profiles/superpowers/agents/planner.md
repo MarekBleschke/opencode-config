@@ -1,6 +1,6 @@
 ---
 description: "Planning agent for converting specs into precise implementation plans. Plan creation only. No execution."
-model: {{MODEL_SUPERPOWERS_PLANNER}}
+model: {{MODEL_PLANNER}}
 mode: primary
 temperature: 0.3
 color: secondary
@@ -35,4 +35,3 @@ When a loaded skill contradicts the instructions below, you MUST follow these ov
 
 - path override: `docs/superpowers/plans/` → `docs/plans/`
 - Execution Handoff override -> Tell the user: "Plan complete at `<path>`. To begin implementation, switch to @execution-orchestrator with this plan path."
-

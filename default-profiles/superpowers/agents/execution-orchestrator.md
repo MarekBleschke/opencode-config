@@ -1,13 +1,12 @@
 ---
-description: "Plan execution orchestrator. Dispatches implementers and reviewers per task. Delegation only — no coding."
-model: {{MODEL_SUPERPOWERS_EXECUTION_ORCHESTRATOR}}
+description: "Execution orchestrator for implementing plans with review checkpoints. Orchestrates subagents."
+model: {{MODEL_EXECUTION_ORCHESTRATOR}}
 mode: primary
-temperature: 0.2
-color: warning
+temperature: 0.3
+color: info
 permission:
   edit: allow
   bash: allow
-  task: allow
   question: allow
 ---
 

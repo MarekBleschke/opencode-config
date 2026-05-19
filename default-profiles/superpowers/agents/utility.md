@@ -1,14 +1,15 @@
 ---
 description: "Lightweight utility agent for ad-hoc housekeeping tasks outside the plan: gitignore updates, config tweaks, untracked file cleanup, small file edits."
-model: {{MODEL_SUPERPOWERS_UTILITY}}
-mode: all
+model: {{MODEL_UTILITY}}
+mode: subagent
+hidden: true
 temperature: 0.2
 color: info
 permission:
   edit: allow
-  bash: allow
-  task:
-    "*": deny
+  bash:
+    "*": allow
+    "git push *": deny
 ---
 
 Execute small, ad-hoc housekeeping tasks exactly as instructed. Nothing more.
