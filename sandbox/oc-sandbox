@@ -46,7 +46,6 @@ Build a container image for the opencode sandbox.
 
 Options:
     -I, --image <NAME>   Image name to build (default: base)
-    -f, --file <PATH>    Explicit Containerfile path (overrides --image)
     -F, --force          Force rebuild even if image already exists
     -h, --help           Show this help message
 EOF
@@ -104,14 +103,10 @@ Shells:
     zsh         Generate Zsh completion script
 
 Options:
-    --refresh           Force-refresh the completion cache
-    --image <NAME>      Refresh cache for a specific image only (used with --refresh)
     -h, --help          Show this help message
 
 Examples:
     source <(oc-sandbox completion zsh)    # Enable Zsh completions
-    oc-sandbox completion --refresh        # Manually refresh all cached data
-    oc-sandbox completion --refresh --image base  # Refresh cache for image "base" only
 EOF
 }
 
@@ -155,7 +150,6 @@ cmd_uninstall() {
   info "Uninstalled ${install_path}"
 
   cleanup_completions
-  cleanup_cache
 }
 
 error() {
@@ -192,14 +186,6 @@ cleanup_completions() {
     fi
     ;;
   esac
-}
-
-cleanup_cache() {
-  local cache_dir="${HOME}/.cache/oc-sandbox"
-  if [ -d "$cache_dir" ]; then
-    rm -rf "$cache_dir" || warn "Could not remove cache directory ${cache_dir}"
-    info "Removed completion cache from ${cache_dir}"
-  fi
 }
 
 # Read a value from an INI-style config file
@@ -312,79 +298,15 @@ _scan_profiles_with_variants() {
   done
 }
 
-_refresh_profiles_for_image() {
-  local image_name="$1"
-  local cache_dir="$2"
-  local now="$3"
-
-  if podman image exists "$image_name" 2>/dev/null; then
-    local profiles
-    profiles=$(_scan_profiles_with_variants)
-    echo "$profiles" >"$cache_dir/profiles-${image_name##*:}"
-    echo "profiles-${image_name##*:}_timestamp=${now}" >>"$cache_dir/cache.meta"
-  fi
-}
-
-cmd_completion_refresh() {
-  local specific_image="${1:-}"
-
-  local cache_dir="${HOME}/.cache/oc-sandbox"
-  mkdir -p "$cache_dir"
-
-  if ! command -v podman &>/dev/null; then
-    warn "podman not found. Cache refresh skipped."
-    return 0
-  fi
-
-  local now
-  now=$(date +%s)
-
-  local images
-  images=$(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${IMAGE_BASE}:" | sed "s|^${IMAGE_BASE}:||" || true)
-  echo "$images" >"$cache_dir/images"
-
-  local existing_profiles_ts=""
-  if [[ -f "$cache_dir/cache.meta" ]]; then
-    existing_profiles_ts=$(grep "^profiles-.*_timestamp=" "$cache_dir/cache.meta" 2>/dev/null || true)
-  fi
-  echo "images_timestamp=${now}" >"$cache_dir/cache.meta"
-  if [[ -n "$existing_profiles_ts" ]]; then
-    echo "$existing_profiles_ts" >>"$cache_dir/cache.meta"
-  fi
-
-  if [ -n "$specific_image" ]; then
-    _refresh_profiles_for_image "${IMAGE_BASE}:${specific_image}" "$cache_dir" "$now"
-  else
-    local image_name
-    while IFS= read -r image_name; do
-      [ -z "$image_name" ] && continue
-      _refresh_profiles_for_image "${IMAGE_BASE}:${image_name}" "$cache_dir" "$now"
-    done <"$cache_dir/images"
-  fi
-}
-
 cmd_completion_zsh() {
   cat "$COMPLETION_ZSH"
 }
 
 cmd_completion() {
-  local refresh="false"
-  local image_arg=""
   local shell_arg=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-    --refresh)
-      refresh="true"
-      shift
-      ;;
-    --image | -I)
-      if [ -z "${2:-}" ]; then
-        error "Option --image requires a value."
-      fi
-      image_arg="$2"
-      shift 2
-      ;;
     -h | --help)
       usage_completion
       exit 0
@@ -401,11 +323,6 @@ cmd_completion() {
       ;;
     esac
   done
-
-  if [ "$refresh" = "true" ]; then
-    cmd_completion_refresh "$image_arg"
-    return
-  fi
 
   if [ -z "${shell_arg:-}" ]; then
     error "Shell name required. Use 'oc-sandbox completion --help' for available shells."
@@ -430,7 +347,6 @@ cmd_completion() {
 # Build subcommand
 cmd_build() {
   local image_name="$DEFAULT_IMAGE"
-  local containerfile_path=""
   local force="false"
 
   # Read default_image from config if available
@@ -448,13 +364,6 @@ cmd_build() {
         error "Option --image requires a value."
       fi
       image_name="$2"
-      shift 2
-      ;;
-    -f | --file)
-      if [ -z "${2:-}" ]; then
-        error "Option --file requires a value."
-      fi
-      containerfile_path="$2"
       shift 2
       ;;
     -F | --force)
@@ -476,12 +385,7 @@ cmd_build() {
 
   check_podman
 
-  # Resolve Containerfile path
-  if [ -n "$containerfile_path" ]; then
-    CONTAINERFILE="$containerfile_path"
-  else
-    CONTAINERFILE="${CONTAINERFILES_DIR}/${image_name}.Containerfile"
-  fi
+  CONTAINERFILE="${CONTAINERFILES_DIR}/${image_name}.Containerfile"
 
   local full_image="${IMAGE_BASE}:${image_name}"
 
@@ -516,7 +420,7 @@ cmd_build() {
     "${build_args[@]}" \
     -t "$full_image" \
     -f "$CONTAINERFILE" \
-    "${SCRIPT_DIR}/.."; then
+    "$DATA_DIR"; then
     error "Container build failed. See output above for details."
   fi
 
@@ -528,8 +432,6 @@ cmd_build() {
   fi
 
   info "Image ${full_image} built successfully."
-
-  oc-sandbox completion --refresh --image "$image_name" >/dev/null 2>&1 || true
 }
 
 # Run subcommand
