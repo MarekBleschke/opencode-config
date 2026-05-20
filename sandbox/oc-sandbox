@@ -34,7 +34,7 @@ Examples:
     oc-sandbox build                        # Build base image
     oc-sandbox build --image python         # Build python image
     oc-sandbox run                           # Run with defaults (image: base, profile: from config)
-    oc-sandbox run --profile superpowers:gpt4  # Use superpowers profile, gpt4 variant
+    oc-sandbox run --profile superpowers:eco  # Use superpowers profile, eco variant
 EOF
 }
 
