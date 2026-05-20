@@ -141,16 +141,16 @@ main() {
 
     if [ -n "$git_name" ] || [ -n "$git_email" ]; then
       if [ -n "$git_name" ]; then
-        local escaped_name
-        escaped_name="${git_name//&/\\&}"
-        sed -i.bak "s|^user_name =.*|user_name = ${escaped_name}|" "$config_file"
-        rm -f "$config_file.bak"
+        awk -v name="$git_name" '
+          /^user_name =/ { print "user_name = " name; next }
+          { print }
+        ' "$config_file" > "${config_file}.tmp" && mv "${config_file}.tmp" "$config_file"
       fi
       if [ -n "$git_email" ]; then
-        local escaped_email
-        escaped_email="${git_email//&/\\&}"
-        sed -i.bak "s|^user_email =.*|user_email = ${escaped_email}|" "$config_file"
-        rm -f "$config_file.bak"
+        awk -v email="$git_email" '
+          /^user_email =/ { print "user_email = " email; next }
+          { print }
+        ' "$config_file" > "${config_file}.tmp" && mv "${config_file}.tmp" "$config_file"
       fi
       info "Populated git identity in config"
     else
