@@ -4,12 +4,18 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 
 ## How to use it
 
-1. **Clone** the repository and install oc-sandbox:
+1. **Install** oc-sandbox:
 
    ```bash
+   # Remote install (no git required):
+   curl -fsSL https://raw.githubusercontent.com/MarekBleschke/oc-sandbox/main/install.sh | bash
+
+   # Or install from a cloned repo (normal mode):
    git clone git@github.com:MarekBleschke/oc-sandbox.git && cd oc-sandbox
-   git submodule update --init --recursive
-   ./sandbox/oc-sandbox install
+   ./install.sh
+
+   # Or install in dev mode (symlinks to source for live editing):
+   ./install.sh --dev
    ```
 
 2. **Build** the container image (required before first run or after config changes):
@@ -22,7 +28,8 @@ A containerized sandbox for running [opencode](https://opencode.ai) agents with 
 
    | Flag | Default | Description |
    |------|---------|-------------|
-   | `-t, --tag <tag>` | —  | Image tag |
+   | `-I, --image <NAME>` | `base` | Image name to build |
+   | `-F, --force` | — | Force rebuild even if image exists |
 
 3. **Run** opencode inside the sandbox:
 
@@ -47,10 +54,11 @@ The config file at `~/.config/oc-sandbox/config` controls defaults:
 ```ini
 [general]
 default_profile = superpowers
+default_image = base
 
-[profile.superpowers]
-brainstorm = opencode-go/glm-5.1
-# ... other agent models
+[git]
+user_name =
+user_email =
 
 [mounts]
 ssh_key = ~/.ssh/id_rsa|/home/sandbox/.ssh/id_rsa
@@ -63,20 +71,38 @@ The `[mounts]` section uses `src_path|container_dst_path` pairs with `~/` expans
 
 ```
 .
-├── sandbox/                  # Container image and CLI
-│   ├── oc-sandbox            # CLI script (build, run, install, completion)
-│   ├── Containerfile         # Podman container image definition
-│   ├── bootstrap.sh          # Initializes submodules during image build
-│   └── opencode-install.sha256
-├── profiles/                 # Opencode configuration profiles
-│   └── superpowers/          # Default profile (agents, skills, plugins, commands)
-├── docs/specs/               # Design documents
-└── submodules/               # Git submodules (e.g. superpowers)
+├── install.sh                  # Curl-able installation script
+├── sandbox/
+│   ├── oc-sandbox              # CLI script (build, run, uninstall, completion)
+│   ├── oc-sandbox.conf          # Config template
+│   ├── completion_zsh           # Zsh completion definitions
+│   ├── init.sh                  # Container ENTRYPOINT — resolves profiles at runtime
+│   ├── opencode-install.sha256  # SHA256 checksum for opencode install script
+│   ├── containerfiles/
+│   │   ├── base.Containerfile   # Ubuntu + system deps + opencode + init.sh
+│   │   ├── python.Containerfile # FROM base + Python
+│   │   └── java.Containerfile   # FROM base + Java
+│   └── test-sandbox.sh          # Integration tests (require podman)
+├── default-profiles/            # Self-contained profile repository
+│   ├── base/                    # Profile directory (flat, no nesting)
+│   │   ├── profile.conf         # Required — marks this as a profile
+│   │   └── opencode.json
+│   └── superpowers/             # Profile directory
+│       ├── profile.conf         # Default variant
+│       ├── profile.eco.conf     # Alternative variant (eco model)
+│       ├── profile.free.conf    # Alternative variant (free model)
+│       ├── opencode.json
+│       ├── agents/              # Template .md files with {{MODEL_*}}
+│       ├── skills/ → submodules/superpowers/skills/    # Internal symlink
+│       ├── plugins/ → submodules/superpowers/plugins/  # Internal symlink
+│       └── submodules/
+│           └── superpowers/     # Git submodule (lives INSIDE profile dir)
+└── docs/specs/                  # Design documents
 ```
 
 ## Adding a new profile
 
-1. Create a directory under `profiles/<name>/` with at minimum an `opencode.json` config file.
-2. Reference any submodules or shared resources via symlinks (see `profiles/superpowers/` for the pattern).
-3. Rebuild the image: `oc-sandbox build --force`
-4. Run with the new profile: `oc-sandbox run --profile <name>`
+1. Create a directory under `default-profiles/<name>/` with at minimum an `opencode.json` config file.
+2. Reference any submodules or shared resources via symlinks (see `default-profiles/superpowers/` for the pattern).
+3. Rebuild the image: `oc-sandbox build -F`
+4. Run with the new profile: `oc-sandbox run -p <name>`

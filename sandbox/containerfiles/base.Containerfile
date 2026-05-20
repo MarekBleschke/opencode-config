@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # System dependencies
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-    git curl ca-certificates openssh-client zsh vim \
+    git curl ca-certificates openssh-client zsh vim shellcheck \
   && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -35,7 +35,7 @@ RUN groupadd -g 1001 sandbox && \
   chown -R sandbox:sandbox /home/sandbox/.local
 
 # Init script
-COPY --chmod=755 sandbox/containerfiles/init.sh /usr/local/bin/oc-sandbox-init.sh
+COPY --chmod=755 init.sh /usr/local/bin/oc-sandbox-init.sh
 
 USER sandbox
 WORKDIR /workspace

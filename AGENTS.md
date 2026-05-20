@@ -11,23 +11,25 @@ You CAN read and edit files matching patterns in `.gitignore`, but you MUST NOT 
 ## Project structure
 
 ```
-sandbox/oc-sandbox            # CLI script — single entrypoint for build/run/install/completion
+sandbox/oc-sandbox            # CLI script — single entrypoint for build/run/uninstall/completion
 sandbox/containerfiles/
-  init.sh                      # Container ENTRYPOINT — resolves profiles at runtime
   base.Containerfile           # Ubuntu + system deps + opencode + init.sh
   python.Containerfile         # FROM base + Python
   java.Containerfile           # FROM base + Java
+sandbox/init.sh                # Container ENTRYPOINT — resolves profiles at runtime
 sandbox/oc-sandbox.conf        # Config template
 sandbox/completion_zsh         # Zsh completion definitions
 sandbox/opencode-install.sha256  # SHA256 checksum for opencode install script
 sandbox/test-sandbox.sh        # Integration tests (require podman — cannot run inside container)
+install.sh                     # Curl-able installation script (repo root)
 default-profiles/              # Self-contained profile repository
   base/                        # Profile directory (flat, no nesting)
     profile.conf               # Required — marks this as a profile
     opencode.json
   superpowers/                 # Profile directory
     profile.conf               # Default variant
-    profile.gpt4.conf          # Alternative (standalone) variant
+    profile.eco.conf           # Alternative variant (eco model)
+    profile.free.conf          # Alternative variant (free model)
     opencode.json
     agents/                    # Template .md files with {{MODEL_*}}
     skills/ → submodules/superpowers/skills/    # Internal symlink
@@ -49,9 +51,9 @@ Each subdirectory is an opencode profile selected at runtime via `oc-sandbox run
 ## Key commands (host only)
 
 These only work on the host with podman installed:
-- `oc-sandbox build [-I IMAGE] [-f FILE] [-F]`
+- `oc-sandbox build [-I IMAGE] [-F]`
 - `oc-sandbox run [-I IMAGE] [-p PROFILE[:VARIANT]] [--debug] [PATH]`
-- `oc-sandbox install [--no-completions]` / `oc-sandbox uninstall`
+- `oc-sandbox uninstall`
 
 ## Bash Scripts: macOS + Linux Compatibility
 
@@ -89,7 +91,8 @@ All bash scripts must run correctly on both macOS (BSD userland) and Linux (GNU 
 
 - The CLI script (`sandbox/oc-sandbox`) uses `set -euo pipefail` and long-form flag parsing with `while/case`.
 - Error output uses colored prefixes: `Error:` (red), `Warning:` (yellow), info (green) — via the `error()`, `warn()`, `info()` functions.
-- The script resolves its own directory with `_resolve_script_dir()` and uses `containerfiles/` directory relative to itself. Do not hardcode paths.
+- The script uses XDG-standard paths with environment variable overrides: `OC_SANDBOX_DATA_DIR`, `OC_SANDBOX_CONFIG_DIR`.
+- Installed files live at `~/.local/bin/oc-sandbox`, `~/.local/share/oc-sandbox/` (data), and `~/.config/oc-sandbox/` (config).
 
 ## Build-Time Customization
 
@@ -101,3 +104,12 @@ All other configuration (git identity, model mappings, profile data) is handled 
 - Git identity: read from mounted config file by `init.sh`
 - Model mappings: read from `profile.conf` by `init.sh`
 - `.gitignore`: mounted directly from host
+
+## Documentation Maintenance
+
+Any change that affects the behavior, commands, project structure, or installation flow described in `README.md` or `AGENTS.md` MUST include corresponding updates to those files. This includes but is not limited to:
+- Adding, removing, or renaming commands or flags
+- Changing file locations or project structure
+- Changing installation or uninstallation procedures
+- Changing configuration paths or environment variables
+- Adding or removing dependencies

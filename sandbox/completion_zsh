@@ -6,7 +6,6 @@ _oc-sandbox() {
   commands=(
     'build:Build a container image'
     'run:Run opencode in a sandbox'
-    'install:Install oc-sandbox as a global command'
     'uninstall:Uninstall the global oc-sandbox command'
     'completion:Generate shell completion scripts'
   )
@@ -24,7 +23,6 @@ _oc-sandbox() {
     case $words[1] in
     build) _oc-sandbox_build ;;
     run) _oc-sandbox_run ;;
-    install) _oc-sandbox_install ;;
     uninstall) _oc-sandbox_uninstall ;;
     completion) _oc-sandbox_completion ;;
     esac
@@ -35,7 +33,6 @@ _oc-sandbox() {
 _oc-sandbox_build() {
   _arguments \
     '(-I --image)--image[Image name to build]:image:_oc-sandbox_images' \
-    '(-f --file)--file[Explicit Containerfile path]:file:_files' \
     '(-F --force)--force[Force rebuild even if image exists]' \
     '(-h --help)--help[Show help message]'
 }
@@ -53,12 +50,6 @@ _oc-sandbox_run() {
     ':path:_files -/'
 }
 
-_oc-sandbox_install() {
-  _arguments \
-    '--no-completions[Skip shell completion setup]' \
-    '(-h --help)--help[Show help message]'
-}
-
 _oc-sandbox_uninstall() {
   _arguments \
     '(-h --help)--help[Show help message]'
@@ -67,23 +58,11 @@ _oc-sandbox_uninstall() {
 _oc-sandbox_completion() {
   _arguments \
     ':shell:_oc-sandbox_shells' \
-    '--refresh[Force-refresh the completion cache]' \
-    '(-I --image)--image[Refresh cache for a specific image only]:image:_oc-sandbox_images' \
     '(-h --help)--help[Show help message]'
 }
 
 _oc-sandbox_images() {
-  local script_dir
-  local source="${BASH_SOURCE[0]}"
-  while [ -L "$source" ]; do
-    local dir
-    dir="$(cd "$(dirname "$source")" && pwd -P)"
-    source="$(readlink "$source")"
-    [[ "$source" != /* ]] && source="$dir/$source"
-  done
-  script_dir="$(cd "$(dirname "$source")" && pwd -P)"
-
-  local containerfiles_dir="${script_dir}/sandbox/containerfiles"
+  local containerfiles_dir="${OC_SANDBOX_DATA_DIR:-$HOME/.local/share/oc-sandbox}/containerfiles"
   [[ -d "$containerfiles_dir" ]] || return 0
   local -a images
   local f
@@ -96,7 +75,7 @@ _oc-sandbox_images() {
 }
 
 _oc-sandbox_profiles() {
-  local profiles_dir="${HOME}/.config/oc-sandbox/profiles"
+  local profiles_dir="${OC_SANDBOX_CONFIG_DIR:-$HOME/.config/oc-sandbox}/profiles"
   [[ -d "$profiles_dir" ]] || return 0
 
   local -a suggestions

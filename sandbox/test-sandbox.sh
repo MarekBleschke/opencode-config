@@ -1200,44 +1200,6 @@ assert_stderr_contains "$OUTPUT" "Not installed" "Uninstall reports not installe
 
 echo ""
 
-# --- Test 42: Uninstall refuses regular file ---
-
-echo "--- Test 42: Uninstall refuses regular file ---"
-
-TEMP_HOME="${TEST_DIR}/temp_home_uninstall_regular"
-mkdir -p "${TEMP_HOME}/.local/bin"
-echo "not a symlink" > "${TEMP_HOME}/.local/bin/oc-sandbox"
-
-OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
-EXIT_CODE=$?
-if [ "$EXIT_CODE" -ne 0 ]; then
-  pass "Uninstall refuses regular file (non-zero exit)"
-else
-  fail "Uninstall should refuse regular file"
-fi
-assert_stderr_contains "$OUTPUT" "Not a symlink" "Uninstall warns about regular file"
-
-echo ""
-
-# --- Test 43: Uninstall refuses symlink to different target ---
-
-echo "--- Test 43: Uninstall refuses different symlink ---"
-
-TEMP_HOME="${TEST_DIR}/temp_home_uninstall_diff"
-mkdir -p "${TEMP_HOME}/.local/bin"
-ln -s /some/other/path "${TEMP_HOME}/.local/bin/oc-sandbox"
-
-OUTPUT=$(HOME="$TEMP_HOME" "$OC_SANDBOX" uninstall 2>&1)
-EXIT_CODE=$?
-if [ "$EXIT_CODE" -ne 0 ]; then
-  pass "Uninstall refuses symlink to different target (non-zero exit)"
-else
-  fail "Uninstall should refuse symlink to different target"
-fi
-assert_stderr_contains "$OUTPUT" "points to a different location" "Uninstall warns about different symlink"
-
-echo ""
-
 # --- Test 44: GitHub CLI available ---
 
 echo "--- Test 44: GitHub CLI available ---"
