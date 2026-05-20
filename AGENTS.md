@@ -28,7 +28,8 @@ default-profiles/              # Self-contained profile repository
     opencode.json
   superpowers/                 # Profile directory
     profile.conf               # Default variant
-    profile.gpt4.conf          # Alternative (standalone) variant
+    profile.eco.conf           # Alternative variant (eco model)
+    profile.free.conf          # Alternative variant (free model)
     opencode.json
     agents/                    # Template .md files with {{MODEL_*}}
     skills/ → submodules/superpowers/skills/    # Internal symlink

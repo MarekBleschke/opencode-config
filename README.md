@@ -54,10 +54,11 @@ The config file at `~/.config/oc-sandbox/config` controls defaults:
 ```ini
 [general]
 default_profile = superpowers
+default_image = base
 
-[profile.superpowers]
-brainstorm = opencode-go/glm-5.1
-# ... other agent models
+[git]
+user_name =
+user_email =
 
 [mounts]
 ssh_key = ~/.ssh/id_rsa|/home/sandbox/.ssh/id_rsa
@@ -88,7 +89,8 @@ The `[mounts]` section uses `src_path|container_dst_path` pairs with `~/` expans
 │   │   └── opencode.json
 │   └── superpowers/             # Profile directory
 │       ├── profile.conf         # Default variant
-│       ├── profile.gpt4.conf    # Alternative (standalone) variant
+│       ├── profile.eco.conf     # Alternative variant (eco model)
+│       ├── profile.free.conf    # Alternative variant (free model)
 │       ├── opencode.json
 │       ├── agents/              # Template .md files with {{MODEL_*}}
 │       ├── skills/ → submodules/superpowers/skills/    # Internal symlink
